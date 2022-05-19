@@ -49,10 +49,9 @@
             if(currLocation !== '') {
                 $("#currLocation").text("Current Coordinates: "+currLocation)
                 coords = currLocation.split(',')
-                locX = parseFloat(coords[0])
-                locY = parseFloat(coords[1])
-                L.marker([locX, locY]).addTo(map)
-                L.circle([51.508, -0.11], {
+                coords = [parseFloat(coords[0]), parseFloat(coords[1])]
+                L.marker(coords).addTo(map)
+                L.circle(coords, {
                     color: 'blue',
                     fillColor: 'blue',
                     fillOpacity: 0.5,
