@@ -14,6 +14,7 @@
     <script src="https://raw.githubusercontent.com/joaomgcd/AutoToolsWebScreens/master/autotoolsfunctions.js"></script>
     <link rel="stylesheet" type="text/css" href="https://raw.githubusercontent.com/joaomgcd/AutoToolsWebScreens/master/autotoolsstyle.css">
     <meta name="autotoolswebscreen" type="variablejs" id="currLocation" label="Current Location" description="The coordinates of the user's current location, separated by a comma (,)" />
+    <meta name="autotoolswebscreen" type="variablejs" id="locationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
     
     <style></style>
 </head>
@@ -22,7 +23,7 @@
     <div class="container-fluid">
         <br>
         <h1>View Trail Map</h1>
-        <p>Current Coordinates: <p id="currLocation"></p></p>
+        <p id="currLocation"></p>
         <div id="map" style="width: 100%; height: 700px;"></div>
     </div>
 
@@ -45,7 +46,21 @@
         map.locate({setView: true, maxZoom: 16});
 
         if (AutoTools.isSet("currLocation")) {
-            $("#currLocation").text(currLocation)
+            if(currLocation !== '') {
+                $("#currLocation").text("Current Coordinates: "+currLocation)
+                coords = currLocation.split(',')
+                locX = parseFloat(coords[0])
+                locY = parseFloat(coords[1])
+                L.marker([locX, locY]).addTo(map)
+                L.circle([51.508, -0.11], {
+                    color: 'blue',
+                    fillColor: 'blue',
+                    fillOpacity: 0.5,
+                    radius: locationAccuracy
+                }).addTo(map);
+            } else {
+                $("#currLocation").hide()
+            }
         } else {
             $("#currLocation").hide()
         }
