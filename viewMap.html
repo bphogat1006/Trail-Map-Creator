@@ -4,10 +4,17 @@
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <title>View Trail Map</title>
-    <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <!-- leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
+    <!-- autotools -->
+    <script src="https://raw.githubusercontent.com/joaomgcd/AutoToolsWebScreens/master/autotoolsfunctions.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://raw.githubusercontent.com/joaomgcd/AutoToolsWebScreens/master/autotoolsstyle.css">
+    <meta name="autotoolswebscreen" type="variablejs" id="currLocation" label="Current Location" description="The coordinates of the user's current location, separated by a comma (,)" />
+    
     <style></style>
 </head>
 <body>
@@ -15,6 +22,7 @@
     <div class="container-fluid">
         <br>
         <h1>View Trail Map</h1>
+        <p>Current Coordinates: <p id="currLocation"></p></p>
         <div id="map" style="width: 100%; height: 700px;"></div>
     </div>
 
@@ -36,7 +44,11 @@
 
         map.locate({setView: true, maxZoom: 16});
 
-
+        if (AutoTools.isSet("currLocation")) {
+            $("#currLocation").text(currLocation)
+        } else {
+            $("#currLocation").hide()
+        }
 
     </script>
 </body>
