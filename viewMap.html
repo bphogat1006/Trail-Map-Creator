@@ -29,6 +29,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="draw.js"></script>
     <script>
         var center = [40.2904995,-74.6873186]
 
@@ -62,28 +63,25 @@
         };
 
         L.control.layers(baseMaps, null).addTo(map);
-        
 
-        if (AutoTools.isSet("currLocation")) {
-            if(currLocation !== '') {
-                $("#currLocation").text("Current Coordinates: "+currLocation)
-                coord = currLocation.split(',')
-                coord = [parseFloat(coord[0]), parseFloat(coord[1])]
-                L.marker(coord).addTo(map)
-                L.circle(coord, {
-                    weight: 1,
-                    fillColor: 'blue',
-                    fillOpacity: 0.5,
-                    radius: locationAccuracy
-                }).addTo(map);
-            } else {
-                $("#currLocation").hide()
-            }
-        } else {
-            $("#currLocation").hide()
-        }
-
-
+        // if (AutoTools.isSet("currLocation")) {
+        //     if(currLocation !== '') {
+        //         $("#currLocation").text("Current Coordinates: "+currLocation)
+        //         coord = currLocation.split(',')
+        //         coord = [parseFloat(coord[0]), parseFloat(coord[1])]
+        //         L.marker(coord).addTo(map)
+        //         L.circle(coord, {
+        //             weight: 1,
+        //             fillColor: 'blue',
+        //             fillOpacity: 0.5,
+        //             radius: locationAccuracy
+        //         }).addTo(map);
+        //     } else {
+        //         $("#currLocation").hide()
+        //     }
+        // } else {
+        //     $("#currLocation").hide()
+        // }
 
         mapData = null
         fetch('coords.txt')
@@ -92,68 +90,6 @@
                 mapData = String(text).split('\n')
                 drawMapData(mapData)
             });
-        
-        function drawMapData(data) {
-            data.shift()
-            coords = []
-            coordsAccuracies = []
-            POIs = []
-            i = 0
-            while(i < data.length) {
-                line = String(data[i])
-                if(line.includes("COORDS")) {
-                    coord = line.split(' ')[1].split(',')
-                    coord = [parseFloat(coord[0]), parseFloat(coord[1])]
-                    coords.push(L.latLng(coord[0], coord[1]))
-                }
-                else if(line.includes("ACCURACY")) {
-                    coordsAccuracies.push(parseFloat(line.split(' ')[1]))
-                }
-                else if(line.includes("POI")) {
-                    i++
-                    line = String(data[i])
-                    coord = line.split(' ')[1].split(',')
-                    coord = [parseFloat(coord[0]), parseFloat(coord[1])]
-                    POIs.push(L.latLng(coord[0], coord[1]))
-                }
-                else if(line.includes("START")) {
-                    drawTrail(coords, coordsAccuracies)
-                    drawPOIs(POIs)
-                    bounds = L.latLngBounds(coords)
-                    map.flyToBounds(bounds, {duration: 1});
-                    break // delete later
-                    coords = []
-                    coordsAccuracies = []
-                }
-                i++
-            }
-        }
-
-        function drawTrail(coords, coordsAccuracies) {
-            for(i=0; i < coords.length; i++) {
-                color = "#00cc00"
-                L.circle(coords[i], {
-                    opacity: 0,
-                    fillColor: color,
-                    fillOpacity: 0.5,
-                    radius: coordsAccuracies[i]
-                }).addTo(map);
-            }
-            L.polyline(coords, {color: color}).addTo(map);
-        }
-
-        function drawPOIs(POIs) {
-            for(coord of POIs) {
-                color = "#0000ff"
-                L.circle(coord, {
-                    opacity: 1,
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.8,
-                    radius: coordsAccuracies[i]
-                }).addTo(map);
-            }
-        }
     </script>
 </body>
 </html>
