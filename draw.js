@@ -41,7 +41,7 @@ function drawMapData(data) {
 
 function drawTrail(coords, coordsAccuracies) {
     for(i=0; i < coords.length; i++) {
-        color = "green"
+        color = "brown"
         L.circle(coords[i], {
             opacity: 0,
             fillColor: color,
