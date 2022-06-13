@@ -1,4 +1,14 @@
 function drawMapData(data) {
+    coords = data.filter(obj => {
+        if (obj.header == "COORDS") return true
+        return false
+    })
+    pois = data.filter(obj => {
+        if (obj.header == "POI") return true
+        return false
+    })
+    
+
     data.shift()
     coords = []
     coordsAccuracies = []
@@ -6,7 +16,7 @@ function drawMapData(data) {
     poiAccuracies = []
     i = 2
     while(i < data.length) {
-        line = String(data[i])
+        line = String(data[i]).replace(/(\r\n|\n|\r)/gm, "")
         if(line.includes("COORDS")) {
             coord = line.split(' ')[1].split(',')
             coord = [parseFloat(coord[0]), parseFloat(coord[1])]
@@ -16,7 +26,7 @@ function drawMapData(data) {
             coordsAccuracies.push(parseFloat(line.split(' ')[1]))
         }
         else if(line.includes("POI")) {
-            i+=2
+            i+=1
             line = String(data[i])
             coord = line.split(' ')[1].split(',')
             coord = [parseFloat(coord[0]), parseFloat(coord[1])]
@@ -40,16 +50,21 @@ function drawMapData(data) {
 }
 
 function drawTrail(coords, coordsAccuracies) {
-    for(i=0; i < coords.length; i++) {
-        color = "brown"
-        L.circle(coords[i], {
-            opacity: 0,
-            fillColor: color,
-            fillOpacity: 0.4,
-            radius: coordsAccuracies[i]
-        }).addTo(map);
-    }
-    L.polyline(coords, {color: 'brown'}).addTo(map);
+    // for(i=0; i < coords.length; i++) {
+    //     color = "brown"
+    //     L.circle(coords[i], {
+    //         opacity: 0,
+    //         fillColor: color,
+    //         fillOpacity: 0.4,
+    //         radius: coordsAccuracies[i]
+    //     }).addTo(map);
+    // }
+    L.polyline(coords, {
+        color: 'brown',
+        smoothFactor: 2,
+        opacity: 0.7,
+        weight: 7
+    }).addTo(map);
 }
 
 function drawPOIs(pois, poiAccuracies) {
