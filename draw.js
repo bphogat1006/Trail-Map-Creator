@@ -1,30 +1,38 @@
 function drawMapData(park, data) {
     currPark = null
     parkData = []
+    
     for (obj of data) {
         if (obj.header === "START") {
             currPark = obj.park
+        }
+        else if (obj.header === "POI") {
+            console.log(obj)
+            if (obj.park === park) {
+                parkData.push(obj)
+            }
         }
         else if (currPark === park) {
             parkData.push(obj)
         }
     }
-    console.log(parkData)
+    // console.log(parkData)
+
     coords = parkData.filter(obj => {
         if (obj.header === "COORDS") return true
         return false
     })
     coordlatLngs = coords.map(e => e.coords)
-    coordAccuracies = coords.map(e => accuracy)
+    coordAccuracies = coords.map(e => e.accuracy)
     pois = parkData.filter(obj => {
         if (obj.header === "POI") return true
         return false
     })
     poiLatLngs = pois.map(e => e.coords)
-    poiAccuracies = pois.map(e => accuracy)
+    poiAccuracies = pois.map(e => e.accuracy)
     drawTrail(coordlatLngs, coordAccuracies)
     drawPOIs(poiLatLngs, poiAccuracies)
-    bounds = L.latLngBounds(coordlatLngs)
+    bounds = L.latLngBounds(coordlatLngs.concat(poiLatLngs))
     map.flyToBounds(bounds, {duration: 2});
 }
 

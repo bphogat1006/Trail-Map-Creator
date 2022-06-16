@@ -15,7 +15,7 @@ class Trail {
     }
 }
 
-function parseDataFile(file, getParksOnly=false) {
+async function parseDataFile(file, getParksOnly=false) {
     return fetch(file)
         .then(response => response.text())
         .then(text => {
@@ -24,14 +24,12 @@ function parseDataFile(file, getParksOnly=false) {
             i=0
             while (i < response.length) {
                 line = String(response[i]).replace(/(\r\n|\n|\r)/gm, "")
-                if (line == "") {
-                    i++
-                    continue
+                if (line != "") {
+                    header = line.split(" ")[0]
+                    contentIndex = header.length+1
+                    content = line.substring(contentIndex).split(" - ")
+                    data.push({header, content})
                 }
-                header = line.split(" ")[0]
-                contentIndex = header.length+1
-                content = line.substring(contentIndex).split(" - ")
-                data.push({header, content})
                 i++
             }
             
@@ -57,28 +55,40 @@ function parseDataFile(file, getParksOnly=false) {
                                 pathType: startData[1],
                                 time: startData[2]
                             })
-                            i+=2
+                            i+=1
                             break
-                        case "COORDS":
-                            time = data[i-1].content[0]
-                            coords = data[i].content[0].split(',')
-                            coords = [parseFloat(coords[0]), parseFloat(coords[1])]
-                            accuracy = parseFloat(data[i+1].content[0])
-                            returnData.push({
-                                header: "COORDS", time, coords, accuracy})
-                            i+=3
+                        case "TIME":
+                            if (data[i+1].header === "COORDS") {
+                                coords = data[i+1].content[0].split(',')
+                                coords = [parseFloat(coords[0]), parseFloat(coords[1])]
+                                returnData.push({
+                                    header: "COORDS",
+                                    time: data[i].content[0],
+                                    coords,
+                                    accuracy: parseFloat(data[i+2].content[0])
+                                })
+                                i+=3
+                            }
+                            else if (data[i+1].header === "POI") {
+                                coords = data[i+2].content[0].split(',')
+                                coords = [parseFloat(coords[0]), parseFloat(coords[1])]
+                                returnData.push({
+                                    header: "POI",
+                                    park: data[i+1].content[0],
+                                    description: data[i+1].content[1],
+                                    time: data[i].content[0],
+                                    coords,
+                                    accuracy: parseFloat(data[i+3].content[0]),
+                                    imgId: data[i+3].content[0],
+                                })
+                                i+=5
+                            }
+                            else {
+                                throw "error while parsing park data file"
+                            }
                             break
-                        case "POI":
-                            time = data[i-1].content[0]
-                            coords = data[i+1].content[0].split(',')
-                            coords = [parseFloat(coords[0]), parseFloat(coords[1])]
-                            accuracy = parseFloat(data[i+2].content[0])
-                            imgId = data[i+3].content[0]
-                            returnData.push({
-                                header: "POI", time, coords, accuracy, imgId
-                            })
-                            i+=5
-                            break
+                        default:
+                            throw "error while parsing park data file"
                     }
                 }
             }
