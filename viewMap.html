@@ -56,23 +56,23 @@
     <script>
         // document related code
         function selectPark(park) {
-            if (park == "Select a Park") return
-            drawParkTrails(park)
+            if (park != "Select a Park") drawParkTrails(park)
         }
 
         function toggleEditMode(e) {
             console.log(e.checked)
         }
 
-        // drawParkTrails("Libro Forest") // DELETE LATER
+        drawParkTrails("Libro Forest") // DELETE LATER
         
         // leaflet related code
         var center = [40.2904995,-74.6873186]
         var map = L.map('map').setView(center, 13);
+
         function drawParkTrails(park) {
             parseDataFile("coords.txt")
                 .then(data => {
-                    drawMapData(data)
+                    drawMapData(park, data)
                 })
         }
 

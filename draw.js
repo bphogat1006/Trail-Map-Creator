@@ -1,52 +1,31 @@
-function drawMapData(data) {
-    coords = data.filter(obj => {
-        if (obj.header == "COORDS") return true
-        return false
-    })
-    pois = data.filter(obj => {
-        if (obj.header == "POI") return true
-        return false
-    })
-    
-
-    data.shift()
-    coords = []
-    coordsAccuracies = []
-    pois = []
-    poiAccuracies = []
-    i = 2
-    while(i < data.length) {
-        line = String(data[i]).replace(/(\r\n|\n|\r)/gm, "")
-        if(line.includes("COORDS")) {
-            coord = line.split(' ')[1].split(',')
-            coord = [parseFloat(coord[0]), parseFloat(coord[1])]
-            coords.push(L.latLng(coord[0], coord[1]))
+function drawMapData(park, data) {
+    currPark = null
+    parkData = []
+    for (obj of data) {
+        if (obj.header === "START") {
+            currPark = obj.park
         }
-        else if(line.includes("ACCURACY")) {
-            coordsAccuracies.push(parseFloat(line.split(' ')[1]))
+        else if (currPark === park) {
+            parkData.push(obj)
         }
-        else if(line.includes("POI")) {
-            i+=1
-            line = String(data[i])
-            coord = line.split(' ')[1].split(',')
-            coord = [parseFloat(coord[0]), parseFloat(coord[1])]
-            pois.push(L.latLng(coord[0], coord[1]))
-            i++
-            line = String(data[i])
-            poiAccuracies.push(parseFloat(line.split(' ')[1]))
-            i++
-        }
-        else if(line.includes("START") || i+1 == data.length) {
-            drawTrail(coords, coordsAccuracies)
-            drawPOIs(pois, poiAccuracies)
-            bounds = L.latLngBounds(coords)
-            map.flyToBounds(bounds, {duration: 1});
-            break // delete later
-            coords = []
-            coordsAccuracies = []
-        }
-        i++
     }
+    console.log(parkData)
+    coords = parkData.filter(obj => {
+        if (obj.header === "COORDS") return true
+        return false
+    })
+    coordlatLngs = coords.map(e => e.coords)
+    coordAccuracies = coords.map(e => accuracy)
+    pois = parkData.filter(obj => {
+        if (obj.header === "POI") return true
+        return false
+    })
+    poiLatLngs = pois.map(e => e.coords)
+    poiAccuracies = pois.map(e => accuracy)
+    drawTrail(coordlatLngs, coordAccuracies)
+    drawPOIs(poiLatLngs, poiAccuracies)
+    bounds = L.latLngBounds(coordlatLngs)
+    map.flyToBounds(bounds, {duration: 2});
 }
 
 function drawTrail(coords, coordsAccuracies) {

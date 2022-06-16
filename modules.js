@@ -34,8 +34,8 @@ function parseDataFile(file, getParksOnly=false) {
                 data.push({header, content})
                 i++
             }
+            
             returnData = []
-            i=0
             if (getParksOnly) {
                 for (obj of data) {
                     if (obj.header == "START") {
@@ -46,6 +46,7 @@ function parseDataFile(file, getParksOnly=false) {
                     }
                 }
             } else {
+                i=0
                 while (i < data.length) {
                     switch (data[i].header) {
                         case "START":
