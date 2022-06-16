@@ -1,17 +1,65 @@
 
+trailTypeProperties = {
+    "Paved": {
+        color: "#474245",
+        weight: 8
+    },
+    "Gravel": {
+        color: "#ADA197",
+        weight: 7
+    },
+    "Dirt": {
+        color: "#6D4830",
+        weight: 6
+    },
+    "Off Trail": {
+        color: "#A8896D",
+        weight: 4
+    },
+    "Brush": {
+        color: "#00B200",
+        weight: 4
+    },
+    "Deer Path": {
+        color: "#2A662A",
+        weight: 3
+    },
+    "_other": {
+        color: "#000000",
+        weight: 4
+    }
+}
+
 class Park {
-    constructor(trails, pois, time) {
-        this.trails = trails // array
-        this.pois = pois
-        this.time = time
+    constructor() {
+        this.trailCollection = {}
+        this.pois = []
+    }
+
+    addTrail(trail, trailType) {
+        if (!(trailType in this.trailCollection)) {
+            this.trailCollection[trailType] = []
+        }
+        this.trailCollection[trailType].push(trail)
+    }
+
+    getTrails(trailType=null) {
+        if (trailType===null) return this.trailCollection
+        return this.trailCollection[trailType]
+    }
+
+    addPoi(poi) {
+        this.pois.push(poi)
+    }
+
+    getPois() {
+        return this.pois
     }
 }
 
 class Trail {
-    constructor(type, coords, time) {
-        this.type = type
+    constructor(coords) {
         this.coords = coords // array
-        this.time = time
     }
 }
 
@@ -52,7 +100,7 @@ async function parseDataFile(file, getParksOnly=false) {
                             returnData.push({
                                 header: "START",
                                 park: startData[0],
-                                pathType: startData[1],
+                                trailType: startData[1],
                                 time: startData[2]
                             })
                             i+=1
@@ -94,7 +142,7 @@ async function parseDataFile(file, getParksOnly=false) {
             }
 
             return new Promise((resolve) => {
-                console.log(returnData)
+                // console.log(returnData)
                 resolve(returnData)
             })
         });
