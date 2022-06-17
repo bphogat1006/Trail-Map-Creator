@@ -51,8 +51,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="draw.js"></script>
     <script src="modules.js"></script>
+    <script src="draw.js"></script>
     <script>
         // document related code
         function selectPark(park) {
@@ -118,6 +118,7 @@
             };
             
             layerControl = L.control.layers(baseMaps, null).addTo(map);
+            
             L.control.scale().addTo(map);
 
             // if (AutoTools.isSet("currLocation")) {
