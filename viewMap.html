@@ -10,13 +10,13 @@
     <!-- leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
+    <!-- fontawesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <!-- autotools -->
     <script type="text/javascript" src="autotoolsfunctions.js"></script>
     <link type="text/css" rel="stylesheet" type="text/css" src="autotoolsstyle.css">
     <meta name="autotoolswebscreen" type="variablejs" id="currLocation" label="Current Location" description="The coordinates of the user's current location, separated by a comma (,)" />
     <meta name="autotoolswebscreen" type="variablejs" id="locationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
-    <!-- fontawesome icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     
     <title>View Trail Map</title>
     <style></style>
@@ -56,23 +56,69 @@
     <script>
         // document related code
         function selectPark(park) {
-            if (park != "null") drawParkTrails(park)
+            if (park != "null") {
+                drawParkTrails(park)
+            } else {
+                mapControl.reset()
+            }
         }
 
         function toggleEditMode(e) {
             console.log(e.checked)
         }
-
-        // drawParkTrails("Libro Forest") // DELETE LATER
         
         // leaflet related code
         var center = [40.086203, -74.707617]
         var map = L.map('map').setView(center, 13);
+        var mapControl = {
+            baseLayers: {},
+            trailLayers: {},
+            pois: L.layerGroup(),
+            layerControl: null,
+            addBaseLayer: function(name, layer) {
+                this.baseLayers[name] = layer
+            },
+            addTrail: function(trail, trailType) {
+                if (!(trailType in this.trailLayers)) {
+                    this.trailLayers[trailType] = L.layerGroup()
+                }
+                this.trailLayers[trailType].addLayer(trail)
+            },
+            addPoi: function(poi) {
+                this.pois.addLayer(poi)
+            },
+            getOverlays: function() {
+                overlays = this.trailLayers
+                overlays["POI"] = this.pois
+                return overlays
+            },
+            finalize: function() {
+                if (this.layerControl === null) {
+                    this.layerControl = L.control.layers(this.baseLayers, this.getOverlays())
+                } else {
+                    throw 'something went wrong in mapControl.finalize()'
+                }
+                for ([name, layerGroup] of Object.entries(this.getOverlays())) {
+                    layerGroup.addTo(map)
+                }
+                this.layerControl.addTo(map)
+            },
+            reset: function() {
+                for ([name, layerGroup] of Object.entries(this.getOverlays())) {
+                    map.removeLayer(layerGroup)
+                }
+                this.layerControl.remove(map)
+                this.layerControl = null
+            }
+        }
+
+        // drawParkTrails("Libro Forest") // DELETE LATER
 
         function drawParkTrails(park) {
             parseDataFile("coords.txt")
                 .then(data => {
                     drawMapData(park, data)
+                    mapControl.finalize()
                 })
         }
 
@@ -108,16 +154,8 @@
                 tileSize: 512,
                 zoomOffset: -1
             })
-            var baseMaps = {
-                "Outdoors": outdoorsMap,
-                "Satellite": satelliteMap
-            };
-
-            var overlayMaps = {
-                "POIs": null
-            };
-            
-            layerControl = L.control.layers(baseMaps, null).addTo(map);
+            mapControl.addBaseLayer("Street", outdoorsMap)
+            mapControl.addBaseLayer("Satellite", satelliteMap)
             
             L.control.scale().addTo(map);
 

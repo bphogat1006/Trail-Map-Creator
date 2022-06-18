@@ -57,12 +57,6 @@ class Park {
     }
 }
 
-class Trail {
-    constructor(coords) {
-        this.coords = coords // array
-    }
-}
-
 async function parseDataFile(file, getParksOnly=false) {
     return fetch(file)
         .then(response => response.text())
@@ -127,7 +121,7 @@ async function parseDataFile(file, getParksOnly=false) {
                                     time: data[i].content[0],
                                     coords,
                                     accuracy: parseFloat(data[i+3].content[0]),
-                                    imgId: data[i+3].content[0],
+                                    imgId: data[i+4].content[0],
                                 })
                                 i+=5
                             }
