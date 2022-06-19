@@ -1,4 +1,3 @@
-
 trailTypeProperties = {
     "Paved": {
         color: "#474245",
@@ -108,11 +107,9 @@ class Park {
     }
 }
 
-async function parseDataFile(file, getParksOnly=false) {
-    return fetch(file)
-        .then(response => response.text())
-        .then(text => {
-            response = String(text).split('\n')
+async function parseDataFile(parkData, getParkNamesOnly=false) {
+    function parseData(text) {
+        response = String(text).split('\n')
             data = []
             i=0
             while (i < response.length) {
@@ -127,7 +124,7 @@ async function parseDataFile(file, getParksOnly=false) {
             }
             
             returnData = []
-            if (getParksOnly) {
+            if (getParkNamesOnly) {
                 for (obj of data) {
                     if (obj.header == "START") {
                         park = obj.content[0]
@@ -190,7 +187,13 @@ async function parseDataFile(file, getParksOnly=false) {
                 // console.log(returnData)
                 resolve(returnData)
             })
-        });
-}
+    }
 
-console.log("modules.js loaded")
+    if (parkData === null) {
+        return fetch("coords.txt")
+            .then(response => response.text())
+            .then(text => {
+                return parseData(text)
+            });
+    }
+}

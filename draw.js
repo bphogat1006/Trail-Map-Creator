@@ -87,7 +87,7 @@ function drawPois(pois) {
         imgSize=80
         markerHtml = `<img src="https://drive.google.com/uc?id=${poi.imgId}" style="
             border-radius: 50%;
-            border: 1px solid rgba(255, 0, 0, .5);
+            border: 1px solid rgba(0, 0, 0, 0.75);
             max-width: ${imgSize}px !important;
             max-height: ${imgSize}px !important;
             object-fit: contain;
@@ -98,7 +98,7 @@ function drawPois(pois) {
                 html: markerHtml,
                 iconSize: [0, 0]
             }),
-            opacity: 0.85
+            opacity: 0.75
         })
         
         popupImgSize = 300
@@ -125,5 +125,4 @@ function drawPois(pois) {
     }
 }
 
-console.log("draw.js loaded")
 ready()

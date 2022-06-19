@@ -55,10 +55,12 @@
     <script id="drawScript"></script>
     <script>
         // autotools related code
+        var parkData = null
         if (AutoTools.isSet("currLocation")) {
             // user is on mobile
             $("#modulesScript").attr("src", "https://raw.githubusercontent.com/bphogat1006/Trail-Map-Creator/main/modules.js")
             $("#drawScript").attr("src", "https://raw.githubusercontent.com/bphogat1006/Trail-Map-Creator/main/draw.js")
+            // set parkData to web screen var passed from autotools
         } else {
             // user is on desktop
             $("#modulesScript").attr("src", "modules.js")
@@ -87,24 +89,24 @@
         var mapControl = null
 
         function drawParkTrails(park) {
-            parseDataFile("coords.txt")
+            parseDataFile(parkData)
                 .then(data => {
                     drawMapData(park, data)
                     mapControl.finalize()
                 })
         }
 
-        // drawParkTrails("Libro Forest") // DELETE LATER
-
         // prepare map & mapControl
         function ready() {
-            console.log("main function called")
+
+            // drawParkTrails("Libro Forest") // TEMPORARY ---- COMMENT OUT
+            
             center = [40.086203, -74.707617]
             map = L.map('map').setView(center, 13);
             mapControl = new MapControl()
 
             // populate park select dropdown with park names
-            parseDataFile("coords.txt", true)
+            parseDataFile(parkData, true)
                 .then(data => {
                     parkNames = data
                     for (parkName of parkNames) {
@@ -137,7 +139,6 @@
             
             L.control.scale().addTo(map);
         }
-        console.log("created main function")
     </script>
 </body>
 </html>
