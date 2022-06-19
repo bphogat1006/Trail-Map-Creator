@@ -70,47 +70,7 @@
         // leaflet related code
         var center = [40.086203, -74.707617]
         var map = L.map('map').setView(center, 13);
-        var mapControl = {
-            baseLayers: {},
-            trailLayers: {},
-            pois: L.layerGroup(),
-            layerControl: null,
-            addBaseLayer: function(name, layer) {
-                this.baseLayers[name] = layer
-            },
-            addTrail: function(trail, trailType) {
-                if (!(trailType in this.trailLayers)) {
-                    this.trailLayers[trailType] = L.layerGroup()
-                }
-                this.trailLayers[trailType].addLayer(trail)
-            },
-            addPoi: function(poi) {
-                this.pois.addLayer(poi)
-            },
-            getOverlays: function() {
-                overlays = this.trailLayers
-                overlays["POI"] = this.pois
-                return overlays
-            },
-            finalize: function() {
-                if (this.layerControl === null) {
-                    this.layerControl = L.control.layers(this.baseLayers, this.getOverlays())
-                } else {
-                    throw 'something went wrong in mapControl.finalize()'
-                }
-                for ([name, layerGroup] of Object.entries(this.getOverlays())) {
-                    layerGroup.addTo(map)
-                }
-                this.layerControl.addTo(map)
-            },
-            reset: function() {
-                for ([name, layerGroup] of Object.entries(this.getOverlays())) {
-                    map.removeLayer(layerGroup)
-                }
-                this.layerControl.remove(map)
-                this.layerControl = null
-            }
-        }
+        var mapControl = new MapControl()
 
         // drawParkTrails("Libro Forest") // DELETE LATER
 

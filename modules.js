@@ -30,6 +30,57 @@ trailTypeProperties = {
     }
 }
 
+class MapControl {
+    constructor() {
+        this.baseLayers = {}
+        this.trailLayers = {}
+        this.pois = L.layerGroup()
+        this.layerControl = null
+        this.changes = []
+    }
+
+    addBaseLayer(name, layer) {
+        this.baseLayers[name] = layer
+    }
+
+    addTrail(trail, trailType) {
+        if (!(trailType in this.trailLayers)) {
+            this.trailLayers[trailType] = L.layerGroup()
+        }
+        this.trailLayers[trailType].addLayer(trail)
+    }
+
+    addPoi(poi) {
+        this.pois.addLayer(poi)
+    }
+
+    getOverlays() {
+        var overlays = this.trailLayers
+        overlays["POI"] = this.pois
+        return overlays
+    }
+
+    finalize() {
+        if (this.layerControl === null) {
+            this.layerControl = L.control.layers(this.baseLayers, this.getOverlays())
+        } else {
+            throw 'something went wrong in mapControl.finalize()'
+        }
+        for (const [name, layerGroup] of Object.entries(this.getOverlays())) {
+            layerGroup.addTo(map)
+        }
+        this.layerControl.addTo(map)
+    }
+
+    reset() {
+        for ([name, layerGroup] of Object.entries(this.getOverlays())) {
+            map.removeLayer(layerGroup)
+        }
+        this.layerControl.remove(map)
+        this.layerControl = null
+    }
+}
+
 class Park {
     constructor() {
         this.trailCollection = {}
