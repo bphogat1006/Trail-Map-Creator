@@ -64,7 +64,7 @@
             $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
             $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
             debug("scripts loaded")
-            parkData = taskerData.parkData.join('\n')
+            parkData = JSON.parse(taskerData).parkData
             debug(parkData)
         } else {
             // user is on desktop

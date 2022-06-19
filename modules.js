@@ -108,8 +108,7 @@ class Park {
 }
 
 async function parseDataFile(parkData, getParkNamesOnly=false) {
-    function parseData(text) {
-        response = String(text).split('\n')
+    function parseData(response) {
         data = []
         i=0
         while (i < response.length) {
@@ -193,7 +192,10 @@ async function parseDataFile(parkData, getParkNamesOnly=false) {
         return fetch("coords.txt")
             .then(response => response.text())
             .then(text => {
-                return parseData(text)
+                response = String(text).split('\n')
+                return parseData(response)
             });
+    } else {
+        return parseData(response)
     }
 }
