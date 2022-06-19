@@ -197,6 +197,6 @@ async function parseDataFile(parkData, getParkNamesOnly=false) {
                 return parseData(response)
             });
     } else {
-        return parseData(response)
+        return parseData(parkData)
     }
 }
