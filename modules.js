@@ -192,3 +192,5 @@ async function parseDataFile(file, getParksOnly=false) {
             })
         });
 }
+
+console.log("modules.js loaded")

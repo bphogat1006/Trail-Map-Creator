@@ -28,7 +28,7 @@ function drawMapData(selectedPark, data) {
         }
     }
     park.addTrail(currTrail, currTrailType)
-    console.log(park)
+    // console.log(park)
 
     // draw trails
     allLatLngs = []
@@ -124,3 +124,6 @@ function drawPois(pois) {
         // new L.Marker(poi.coords).addTo(map)
     }
 }
+
+console.log("draw.js loaded")
+ready()
