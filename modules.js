@@ -109,6 +109,7 @@ class Park {
 
 async function parseDataFile(parkData, getParkNamesOnly=false) {
     function parseData(response) {
+        debug(response)
         data = []
         i=0
         while (i < response.length) {
@@ -121,7 +122,7 @@ async function parseDataFile(parkData, getParkNamesOnly=false) {
             }
             i++
         }
-        
+        debug(data)
         returnData = []
         if (getParkNamesOnly) {
             for (obj of data) {
