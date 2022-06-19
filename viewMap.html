@@ -17,7 +17,7 @@
     <link type="text/css" rel="stylesheet" type="text/css" src="autotoolsstyle.css">
     <meta name="autotoolswebscreen" type="variablejs" id="currLocation" label="Current Location" description="The coordinates of the user's current location, separated by a comma (,)" />
     <meta name="autotoolswebscreen" type="variablejs" id="locationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
-    <meta name="autotoolswebscreen" type="variablejs" id="coordsData" label="Park Data" description="The contents of 'coords.txt' file" />
+    <meta name="autotoolswebscreen" type="variablejs" id="taskerData" label="Park Data" description="The contents of 'coords.txt' file" />
     
     <title>View Trail Map</title>
     <style></style>
@@ -60,11 +60,9 @@
         var parkData = null
         if (AutoTools.isSet("coordsData")) {
             // user is on mobile
-            debug("on mobile")
             $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
             $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
-            debug("scripts loaded")
-            parkData = coordsData
+            parkData = taskerData.parkData.join('\n')
             debug(parkData)
         } else {
             // user is on desktop
