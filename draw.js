@@ -124,5 +124,5 @@ function drawPois(pois) {
         // new L.Marker(poi.coords).addTo(map)
     }
 }
-
+debug("ready")
 ready()

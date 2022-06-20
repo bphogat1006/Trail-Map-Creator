@@ -20,7 +20,6 @@
     <meta name="autotoolswebscreen" type="variablejs" id="taskerData" label="Park Data" description="The contents of 'coords.txt' file" />
     
     <title>View Trail Map</title>
-    <style></style>
 </head>
 <body>
 
@@ -57,13 +56,17 @@
     <script id="drawScript" type="text/javascript"></script>
     <script>
         // autotools related code
-        var parkData = null
+        parkData = null
+        onMobile = false
         if (AutoTools.isSet("taskerData")) {
             // user is on mobile
             $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
             $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
+            document.getElementById("editModeContainer").style.visibility = "hidden"
+            onMobile = true
+            // autotools variable handling
             parkData = JSON.parse(taskerData).parkData
-            debug("Park Data: "+parkData)
+            debug(parkData[1])
         } else {
             // user is on desktop
             $("#modulesScript").attr("src", "modules.js")
@@ -147,6 +150,7 @@
             
             L.control.scale().addTo(map);
         }
+        debug("base script loaded")
     </script>
 </body>
 </html>
