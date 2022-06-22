@@ -32,7 +32,7 @@ function drawMapData(selectedPark, data) {
 
     // draw trails
     allLatLngs = []
-    for ([trailType, trails] of Object.entries(park.getTrails())) {
+    for (var [trailType, trails] of Object.entries(park.getTrails())) {
         for (trail of trails) {
             trailLatLngs = trail.map(coords => L.latLng(coords.coords))
             allLatLngs = allLatLngs.concat(trailLatLngs)
@@ -47,7 +47,7 @@ function drawMapData(selectedPark, data) {
 
     // fly to bounds
     allLatLngs = allLatLngs.concat(pois.map(poi => poi.coords))
-    map.flyToBounds(allLatLngs, {duration: 0.5})
+    map.flyToBounds(allLatLngs, {duration: 2})
 }
 
 function drawTrail(trail, trailType) {
@@ -124,5 +124,5 @@ function drawPois(pois) {
         // new L.Marker(poi.coords).addTo(map)
     }
 }
-debug("ready")
+
 ready()

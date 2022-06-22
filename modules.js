@@ -65,14 +65,14 @@ class MapControl {
         } else {
             throw 'something went wrong in mapControl.finalize()'
         }
-        for (const [name, layerGroup] of Object.entries(this.getOverlays())) {
+        for (var [name, layerGroup] of Object.entries(this.getOverlays())) {
             layerGroup.addTo(map)
         }
         this.layerControl.addTo(map)
     }
 
     reset() {
-        for ([name, layerGroup] of Object.entries(this.getOverlays())) {
+        for (var [name, layerGroup] of Object.entries(this.getOverlays())) {
             map.removeLayer(layerGroup)
         }
         this.layerControl.remove(map)

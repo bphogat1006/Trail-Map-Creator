@@ -11,12 +11,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
     <!-- fontawesome icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://kit.fontawesome.com/5d2140906c.js" crossorigin="anonymous"></script>
     <!-- autotools -->
     <script type="text/javascript" src="autotoolsfunctions.js"></script>
     <link type="text/css" rel="stylesheet" type="text/css" src="autotoolsstyle.css">
-    <meta name="autotoolswebscreen" type="variablejs" id="currLocation" label="Current Location" description="The coordinates of the user's current location, separated by a comma (,)" />
-    <meta name="autotoolswebscreen" type="variablejs" id="locationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
+    <meta name="autotoolswebscreen" type="variablejs" id="userLocation" label="Current User Location" description="The coordinates of the user's current location, separated by a comma (,)" />
+    <meta name="autotoolswebscreen" type="variablejs" id="userLocationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
     <meta name="autotoolswebscreen" type="variablejs" id="taskerData" label="Park Data" description="The contents of 'coords.txt' file" />
     
     <title>View Trail Map</title>
@@ -25,7 +25,12 @@
 
     <div class="container-fluid">
         <br>
-        <h1>View Trail Map</h1>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="">View Trail Map</h1>
+            <div>
+                <div id="locate" class="btn btn-success" onclick="AutoTools.sendCommand('getLocation', 'tmc', true)">Locate&nbsp;<i class="fa-solid fa-location-dot"></i></div>
+            </div>
+        </div>
         <p id="debug" style="visibility:hidden"></p>
 
         <!-- select park -->
@@ -38,7 +43,7 @@
 
         <!-- download coords link -->
         <div class="mt-3 me-auto">
-            <a class="btn btn-primary mt-3" href="https://drive.google.com/file/d/1SYdCU8XFWex02pqbbHsDmp7YktFZ7237/view" target="_blank"><i class="fa fa-download"></i> &nbspDownload Coordinates File</a>
+            <a class="btn btn-primary mt-3" href="https://drive.google.com/file/d/1SYdCU8XFWex02pqbbHsDmp7YktFZ7237/view" target="_blank"><i class="fa fa-download"></i> &nbsp;Download Coordinates File</a>
         </div>
 
         <!-- toggle edit mode -->
@@ -60,17 +65,38 @@
         onMobile = false
         if (AutoTools.isSet("taskerData")) {
             // user is on mobile
-            $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
-            $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
+            // $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
+            // $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
             document.getElementById("editModeContainer").style.visibility = "hidden"
             onMobile = true
-            // autotools variable handling
             parkData = JSON.parse(taskerData).parkData
-            debug(parkData[1])
         } else {
             // user is on desktop
             $("#modulesScript").attr("src", "modules.js")
             $("#drawScript").attr("src", "draw.js")
+            document.getElementById("locate").style.visibility = "hidden"
+        }
+
+        userLocation = null
+        autoToolsUpdateValues = function(values) {
+            if (userLocation != null ) {
+                map.removeLayer(userLocation)
+            }
+            userLocation = L.layerGroup()
+            coords = values.userLocation.split(",")
+            coords = [parseFloat(coords[0]), parseFloat(coords[1])]
+            accuracy = values.userLocationAccuracy
+            userLocationMarker = L.marker(coords)
+            userLocationAccuracy = L.circle(coords, {
+                radius: accuracy,
+                opacity: 0,
+                fillColor: 'blue',
+                fillOpacity: 0.4
+            })
+            userLocation.addLayer(userLocationMarker)
+            userLocation.addLayer(userLocationAccuracy)
+            userLocation.addTo(map)
+            map.panTo(coords, map.getZoom(), {duration: 2})
         }
 
         // document related code
@@ -150,7 +176,6 @@
             
             L.control.scale().addTo(map);
         }
-        debug("base script loaded")
     </script>
 </body>
 </html>
