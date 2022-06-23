@@ -5,26 +5,30 @@ function drawMapData(selectedPark, data) {
     currTrailType = null
     currTrail = null
     for (obj of data) {
-        if (obj.header === "START") {
-            if (currPark === selectedPark && currTrail != null) {
-                park.addTrail(currTrail, currTrailType)
-            }
-            currPark = obj.park
-            currTrailType = obj.trailType
-            currTrail = []
-        }
-        else if (obj.header === "POI") {
-            if (obj.park === selectedPark) {
-                park.addPoi(obj)
-            }
-        }
-        else if (obj.header === "COORDS") {
-            if (currPark === selectedPark) {// "COORDS"
-                currTrail.push(obj)
-            }
-        }
-        else {
-            throw "something went wrong while parsing data for the selected park"
+        switch (obj.header) {
+            case "START":
+                if (currPark === selectedPark && currTrail != null) {
+                    park.addTrail(currTrail, currTrailType)
+                }
+                currPark = obj.park
+                currTrailType = obj.trailType
+                currTrail = []
+                break;
+        
+            case "COORDS":
+                if (currPark === selectedPark) {// "COORDS"
+                    currTrail.push(obj)
+                }
+                break;
+        
+            case "POI":
+                if (obj.park === selectedPark) {
+                    park.addPoi(obj)
+                }
+                break;
+        
+            default:
+                throw "Something went wrong while parsing data for the selected park"
         }
     }
     park.addTrail(currTrail, currTrailType)

@@ -87,7 +87,8 @@ class MapControl {
     }
 
     enableEditMode() {
-        $("#editMode").hide("slow")
+        $("#editMode").hide("fast")
+        $("#editModeMessage").delay(200).show("fast").delay(3000).hide("fast");
         this.reset()
         this.editMode = true
     }
@@ -98,6 +99,8 @@ class MapControl {
     }
 
     commitChanges() {
+        $("#commitModifications").hide("slow")
+        debug("Make changes to coords.txt and refresh")
         parseDataFile().then(data => {
             for (var modification of this.modifications) {
                 
@@ -154,9 +157,27 @@ class MapControl {
             }
 
             var dataString = ""
-            // TODO: convert modified data[] to string in the form of coords.txt file
-            dataString = JSON.stringify(data)
+            for (obj of data) {
+                dataString += "\n"
+                switch (obj.header) {
+                    case "START":
+                        
+                        break;
+                
+                    case "COORDS":
+                        
+                        break;
+                
+                    case "POI":
+                        
+                        break;
+                
+                    default:
+                        break;
+                }
+            }
 
+            console.log(dataString)
             navigator.clipboard.writeText(dataString)
         })
     }
