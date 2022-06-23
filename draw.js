@@ -36,7 +36,6 @@ function drawMapData(selectedPark, data) {
         for (trail of trails) {
             trailLatLngs = trail.map(coords => L.latLng(coords.coords))
             allLatLngs = allLatLngs.concat(trailLatLngs)
-            latLngAccuracies = trail.map(coords => coords.accuracy)
             drawTrail(trail, trailType)
         }
     }
@@ -47,26 +46,47 @@ function drawMapData(selectedPark, data) {
 
     // fly to bounds
     allLatLngs = allLatLngs.concat(pois.map(poi => poi.coords))
-    map.flyToBounds(allLatLngs, {duration: 2})
+    map.flyToBounds(allLatLngs, {duration: 2.5})
 }
 
 function drawTrail(trail, trailType) {
     trailLatLngs = trail.map(coords => L.latLng(coords.coords))
     latLngAccuracies = trail.map(coords => coords.accuracy)
-    drawingProperties = trailTypeProperties[trailType]
+    timeIds = trail.map(coords => coords.time)
+    drawingProps = drawingProperties[trailType]
 
-    // for(i=0; i < coords.length; i++) {
-    //     L.circle(coords[i], {
-    //         opacity: 0,
-    //         fillColor: drawingProperties.color,
-    //         fillOpacity: 0.6,
-    //         radius: latLngAccuracies[i]
-    //     }).addTo(map);
-    // }
+    if (mapControl.editMode) {
+        for(i=0; i < trailLatLngs.length; i++) {
+            L.circle(trailLatLngs[i], {
+                radius: latLngAccuracies[i],
+                fillColor: drawingProps.color,
+                fillOpacity: 0.3,
+                opacity: 0
+            }).addTo(map)
+            coordMarker = L.marker(trailLatLngs[i], {
+                opacity: 0.6,
+                draggable: true
+            })
+            coordMarker.bindPopup(timeIds[i])
+            coordMarker.on('dragend', (e) => {
+                time = e.target.getPopup().getContent()
+                coords = e.target.getLatLng()
+                coords = `${coords.lat},${coords.lng}`
+                modification = {
+                    type: "moveCoords",
+                    id: time,
+                    coords
+                }
+                mapControl.addModification(modification)
+            })
+            coordMarker.addTo(map)
+        }
+    }
+    
     trail = L.polyline(trailLatLngs, {
         opacity: 1,
-        color: drawingProperties.color,
-        weight: drawingProperties.weight,
+        color: drawingProps.color,
+        weight: drawingProps.weight,
         smoothFactor: 2
     }).addTo(map);
 
@@ -84,7 +104,7 @@ function drawPois(pois) {
         //     radius: poi.accuracy
         // }).addTo(map);
         
-        imgSize=80
+        imgSize=55
         markerHtml = `<img src="https://drive.google.com/uc?id=${poi.imgId}" style="
             border-radius: 50%;
             border: 1px solid rgba(0, 0, 0, 0.75);
@@ -93,7 +113,7 @@ function drawPois(pois) {
             object-fit: contain;
             margin-top:-${imgSize/2}px;
             margin-left:-${imgSize/2}px;"/>`
-        poiMarker = new L.Marker(poi.coords, {
+        poiMarker = new L.marker(poi.coords, {
             icon: L.divIcon({
                 html: markerHtml,
                 iconSize: [0, 0]

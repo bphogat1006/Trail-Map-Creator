@@ -1,4 +1,4 @@
-trailTypeProperties = {
+drawingProperties = {
     "Paved": {
         color: "#474245",
         weight: 8
@@ -35,7 +35,8 @@ class MapControl {
         this.trailLayers = {}
         this.pois = L.layerGroup()
         this.layerControl = null
-        this.changes = []
+        this.editMode = false
+        this.modifications = []
     }
 
     addBaseLayer(name, layer) {
@@ -72,11 +73,92 @@ class MapControl {
     }
 
     reset() {
+        $("#selectPark").val("null")
         for (var [name, layerGroup] of Object.entries(this.getOverlays())) {
             map.removeLayer(layerGroup)
         }
-        this.layerControl.remove(map)
+        if (this.layerControl != null) {
+            this.layerControl.remove(map)
+        }
+        this.baseLayers = {}
+        this.trailLayers = {}
+        this.pois = L.layerGroup()
         this.layerControl = null
+    }
+
+    enableEditMode() {
+        $("#editMode").hide("slow")
+        this.reset()
+        this.editMode = true
+    }
+
+    addModification(modification) {
+        this.modifications.push(modification)
+        $("#commitModifications").show("slow")
+    }
+
+    commitChanges() {
+        parseDataFile().then(data => {
+            for (var modification of this.modifications) {
+                
+                switch (modification.type) {
+                    
+                    // Modify coords
+
+                    case "moveCoords":
+                        for (i=0; i < data.length; i++) {
+                            if (data[i].header === "COORDS" && data[i].time === modification.id) {
+                                data[i].coords = modification.coords
+                                console.log("Changed", data[i])
+                                break
+                            }
+                        }
+                        if (i === data.length) throw `Modification failed: ${modification}`
+                        break;
+                        
+                    case "deleteCoords":
+                        
+                        break;
+                        
+                    // Modify trails
+
+                    case "splitTrail":
+                        
+                        break;
+
+                    case "deleteTrail":
+                        
+                        break;
+                        
+                    case "joinTrail":
+                        
+                        break;
+                        
+                    // Modify POIs
+                    
+                    case "movePoi":
+                        
+                        break;
+                        
+                    case "deletePoi":
+                        
+                        break;
+                        
+                    case "changePoiLink":
+                        
+                        break;
+                
+                    default:
+                        throw 'modification type not recognized'
+                }
+            }
+
+            var dataString = ""
+            // TODO: convert modified data[] to string in the form of coords.txt file
+            dataString = JSON.stringify(data)
+
+            navigator.clipboard.writeText(dataString)
+        })
     }
 }
 
@@ -86,7 +168,7 @@ class Park {
         this.pois = []
     }
 
-    addTrail(trail, trailType) {
+    addTrail(trail, trailType) { // trail: array of COORDS objects. trailType: string
         if (!(trailType in this.trailCollection)) {
             this.trailCollection[trailType] = []
         }
@@ -107,7 +189,7 @@ class Park {
     }
 }
 
-async function parseDataFile(parkData, getParkNamesOnly=false) {
+async function parseDataFile(parkData=null, getParkNamesOnly=false) {
     function parseData(response) {
         data = []
         i=0

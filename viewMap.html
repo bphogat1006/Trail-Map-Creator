@@ -43,15 +43,15 @@
 
         <!-- download coords link -->
         <div class="mt-3 me-auto">
-            <a class="btn btn-primary mt-3" href="https://drive.google.com/file/d/1SYdCU8XFWex02pqbbHsDmp7YktFZ7237/view" target="_blank"><i class="fa fa-download"></i> &nbsp;Download Coordinates File</a>
+            <a class="btn btn-primary" href="https://drive.google.com/file/d/1SYdCU8XFWex02pqbbHsDmp7YktFZ7237/view" target="_blank"><i class="fa fa-download"></i> &nbsp;Download Coordinates File</a>
         </div>
 
-        <!-- toggle edit mode -->
-        <div class="bg-secondary mt-3 p-2 rounded d-inline-block" id="editModeContainer">
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="editModeSwitch" onchange="toggleEditMode(this)">
-                <label class="form-check-label text-white" for="editModeSwitch">Enable Edit Mode</label>
-            </div>
+        <!-- edit mode -->
+        <div class="mt-3" id="editMode">
+            <div class="btn btn-warning" onclick='mapControl.enableEditMode()'><i class="fa-solid fa-circle-chevron-right"></i> &nbsp;Enable Edit Mode</div>
+        </div>
+        <div id="commitModifications" class="mt-3 me-auto">
+            <div class="btn btn-success" onclick="mapControl.commitChanges()"><i class="fa-solid fa-circle-chevron-right"></i> &nbsp;Commit Changes</div>
         </div>
     </div>
 
@@ -67,7 +67,7 @@
             // user is on mobile
             // $("#modulesScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/modules.js")
             // $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
-            document.getElementById("editModeContainer").style.visibility = "hidden"
+            document.getElementById("editMode").style.visibility = "hidden"
             onMobile = true
             parkData = JSON.parse(taskerData).parkData
         } else {
@@ -96,22 +96,19 @@
             userLocation.addLayer(userLocationMarker)
             userLocation.addLayer(userLocationAccuracy)
             userLocation.addTo(map)
-            map.panTo(coords, map.getZoom(), {duration: 2})
+            map.flyTo(coords, map.getZoom(), {duration: 2.5})
         }
 
         // document related code
-        function selectPark(park) {
-            if (park != "null") {
-                drawParkTrails(park)
-            } else {
-                mapControl.reset()
-            }
-        }
+        $(() => {
+            $("#commitModifications").hide()
+        })
 
-        function toggleEditMode(e) {
-            if (e.checked) {
+        function selectPark(park) {
+            if (park == "null") {
                 mapControl.reset()
-                // TODO
+            } else {
+                drawParkTrails(park)
             }
         }
 
