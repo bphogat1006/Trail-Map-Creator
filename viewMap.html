@@ -65,6 +65,7 @@
     <script id="modulesScript" type="text/javascript"></script>
     <script id="drawScript" type="text/javascript"></script>
     <script>
+        
         // autotools related code
         parkData = null
         onMobile = false
@@ -74,7 +75,7 @@
             // $("#drawScript").attr("src", "https://cdn.jsdelivr.net/gh/bphogat1006/Trail-Map-Creator/draw.js")
             document.getElementById("editMode").style.visibility = "hidden"
             onMobile = true
-            parkData = JSON.parse(taskerData).parkData
+            parkData = taskerData
         } else {
             // user is on desktop
             $("#modulesScript").attr("src", "modules.js")
@@ -110,11 +111,15 @@
             $("#commitModifications").hide()
         })
 
-        function selectPark(park) {
-            if (park == "null") {
+        function selectPark(selectedPark) {
+            if (selectedPark == "null") {
                 mapControl.reset()
             } else {
-                drawParkTrails(park)
+                parseDataFile(parkData, selectedPark)
+                    .then(data => {
+                        drawParkData(data)
+                        mapControl.finalize()
+                    })
             }
         }
 
@@ -128,25 +133,17 @@
         var map = null
         var mapControl = null
 
-        function drawParkTrails(park) {
-            parseDataFile(parkData)
-                .then(data => {
-                    drawMapData(park, data)
-                    mapControl.finalize()
-                })
-        }
-
         // prepare map & mapControl
         function ready() {
 
-            // drawParkTrails("Libro Forest") // TEMPORARY ---- COMMENT OUT
+            // selectPark("Libro Forest") // TEMPORARY ---- COMMENT OUT
             
             center = [40.086203, -74.707617]
             map = L.map('map').setView(center, 13);
             mapControl = new MapControl()
 
             // populate park select dropdown with park names
-            parseDataFile(parkData, true)
+            parseDataFile(parkData, null, true)
                 .then(data => {
                     parkNames = data
                     for (parkName of parkNames) {
@@ -159,7 +156,7 @@
             
             // set up base map layers
             var outdoorsMap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-                maxZoom: 22,
+                maxZoom: 23,
                 attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
                     'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
                 id: 'mapbox/outdoors-v11',
@@ -167,15 +164,17 @@
                 zoomOffset: -1
             }).addTo(map)
             var satelliteMap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-                maxZoom: 22,
+                maxZoom: 23,
                 attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
                     'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
                 id: 'mapbox/satellite-v9',
                 tileSize: 512,
                 zoomOffset: -1
             })
-            mapControl.addBaseLayer("Street", outdoorsMap)
-            mapControl.addBaseLayer("Satellite", satelliteMap)
+            L.control.layers({
+                "Street": outdoorsMap,
+                "Satellite": satelliteMap
+            }).addTo(map)
             
             L.control.scale().addTo(map);
         }
