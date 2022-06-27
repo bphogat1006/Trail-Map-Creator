@@ -36,9 +36,11 @@ function drawParkData(data) {
     allLatLngs = []
     for (var [trailType, trails] of Object.entries(park.getTrails())) {
         for (trail of trails) {
-            trailLatLngs = trail.map(coords => L.latLng(coords.coords))
-            allLatLngs = allLatLngs.concat(trailLatLngs)
-            drawTrail(trail, trailType)
+            if (trail !== null) {
+                trailLatLngs = trail.map(coords => L.latLng(coords.coords))
+                allLatLngs = allLatLngs.concat(trailLatLngs)
+                drawTrail(trail, trailType)
+            }
         }
     }
 
@@ -281,4 +283,6 @@ function drawIntersections(intersections) {
     }
 }
 
-ready()
+if (typeof onMobile !== "undefined") {
+    ready()
+}

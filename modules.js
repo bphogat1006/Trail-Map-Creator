@@ -115,7 +115,6 @@ class MapControl {
     }
 
     reset() {
-        $("#selectPark").val("null")
         for (var [name, layerGroup] of Object.entries(this.getOverlays())) {
             map.removeLayer(layerGroup)
         }
@@ -132,6 +131,7 @@ class MapControl {
     enableEditMode() {
         $("#editMode").hide("fast")
         $("#editModeMessage").delay(200).show("fast").delay(1500).hide("fast");
+        $("#selectPark").val("null")
         this.reset()
         this.editMode = true
     }
