@@ -29,8 +29,16 @@ class Park {
 class MapControl {
     drawingProperties = {
         trail: {
+            "Road": {
+                color: "#303030",
+                weight: 9
+            },
+            "Boardwalk": {
+                color: "#946d4a",
+                weight: 8
+            },
             "Paved": {
-                color: "#474245",
+                color: "#4a4a4a",
                 weight: 8
             },
             "Gravel": {
@@ -41,9 +49,9 @@ class MapControl {
                 color: "#6D4830",
                 weight: 6
             },
-            "Off Trail": {
-                color: "#A8896D",
-                weight: 4
+            "Grass": {
+                color: "#80d62d",
+                weight: 6
             },
             "Brush": {
                 color: "#00B200",
@@ -170,43 +178,21 @@ class MapControl {
                         }
                         break;
                         
-                    // Modify POIs
-                    
-                    case "movePoi":
-                        for (obj of data) {
-                            if (obj.header === "POI" && obj.time === modification.id) {
-                                obj.coords = modification.coords
-                                break
-                            }
-                        }
-                        break;
-                        
-                    case "deletePoi":
-                        for (var i=0; i < data.length; i++) {
-                            if (data[i].header === "POI" && data[i].time === modification.id) {
-                                data.splice(i, 1)
-                                break
-                            }
-                        }
-                        break;
-                        
-                    case "changePoiLink":
-                        for (obj of data) {
-                            if (obj.header === "POI" && obj.time === modification.id) {
-                                obj.imgId = modification.imgId
-                                break
-                            }
-                        }
-                        break;
-                        
                     // Modify trails
 
                     case "splitTrail":
                         for (var i=0; i < data.length; i++) {
                             if (data[i].header === "COORDS" && data[i].time === modification.id) {
+                                var trailType = null
+                                for (var j=i; j >= 0; j--) {
+                                    if (data[j].header === "START") {
+                                        trailType = data[j].trailType
+                                        break
+                                    }
+                                }
                                 data.splice(i, 0, {
                                     header: "START",
-                                    trailType: "Carpet",
+                                    trailType: trailType,
                                     time: data[i].time
                                 })
                                 break
@@ -230,12 +216,57 @@ class MapControl {
                         }
                         break;
                         
-                    case "joinTrail":
-                        
+                    case "changeTrailType":
+                        for (var i=0; i < data.length; i++) {
+                            if (data[i].header === "COORDS" && data[i].time === modification.id) {
+                                var trailType = null
+                                for (var j=i; j >= 0; j--) {
+                                    if (data[j].header === "START") {
+                                        data[j].trailType = modification.trailType
+                                        break
+                                    }
+                                }
+                                break
+                            }
+                        }
                         break;
                         
-                    case "reverseTrail":
+                    // Modify POIs
+                    
+                    case "movePoi":
+                        for (obj of data) {
+                            if (obj.header === "POI" && obj.time === modification.id) {
+                                obj.coords = modification.coords
+                                break
+                            }
+                        }
+                        break;
                         
+                    case "deletePoi":
+                        for (var i=0; i < data.length; i++) {
+                            if (data[i].header === "POI" && data[i].time === modification.id) {
+                                data.splice(i, 1)
+                                break
+                            }
+                        }
+                        break;
+                        
+                    case "changePoiDescription":
+                        for (obj of data) {
+                            if (obj.header === "POI" && obj.time === modification.id) {
+                                obj.description = modification.description
+                                break
+                            }
+                        }
+                        break;
+                        
+                    case "changePoiLink":
+                        for (obj of data) {
+                            if (obj.header === "POI" && obj.time === modification.id) {
+                                obj.imgId = modification.imgId
+                                break
+                            }
+                        }
                         break;
 
                     // Modify intersections

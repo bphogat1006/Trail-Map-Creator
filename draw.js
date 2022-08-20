@@ -53,7 +53,7 @@ function drawParkData(data) {
     // fly to bounds
     allLatLngs = allLatLngs.concat(park.pois.map(poi => poi.coords))
     allLatLngs = allLatLngs.concat(park.intersections.map(intersection => intersection.coords))
-    map.flyToBounds(allLatLngs, {duration: 2.5})
+    map.flyToBounds(allLatLngs, {duration: (mapControl.editMode) ? 0.01 : 2.5})
 }
 
 function drawTrail(trail, trailType) {
@@ -66,6 +66,7 @@ function drawTrail(trail, trailType) {
         drawingProps = mapControl.drawingProperties.trail[trailType]
     } else {
         drawingProps = mapControl.drawingProperties.trail["undefined"]
+        console.log(`Need to define drawing properties for trail type ${trailType}`)
     }
 
     if (mapControl.editMode) {
@@ -95,18 +96,19 @@ function drawTrail(trail, trailType) {
                     </button>
                 `
             }
+            const rand = Math.random()
             coordMarker.bindPopup(`
                 <p>${timeIds[i]}</p>
                 ${createModificationHTML('Delete', 'Delete this coordinate', 'deleteCoords')}
-                ${createModificationHTML('Split', 'Split trail and start a new one at this coordinate', 'splitTrail')}
                 ${createModificationHTML('Delete', 'Delete this trail', 'deleteTrail')}
-                <p>Join with another trail</p>
-                <input type="number" id="joinId" placeholder="Enter marker ID">
+                ${createModificationHTML('Split', 'Split trail and start a new one at this coordinate', 'splitTrail')}
+                <p>Change Trail Type</p>
+                <input type="text" id="${rand}">
                 <button
                     onclick='mapControl.addModification({
-                        type: "joinTrail",
+                        type: "changeTrailType",
                         id: "${time}",
-                        joinId: document.getElementById("joinId").value
+                        trailType: document.getElementById("${rand}").value
                     })'>
                     Submit
                 </button>
@@ -157,6 +159,8 @@ function drawPois(pois) {
         })
         
         if (mapControl.editMode) {
+            const rand1 = Math.random()
+            const rand2 = Math.random()
             poiMarker.bindPopup(`
                 <p>${time}</p>
                 <p>Delete POI</p>
@@ -167,13 +171,23 @@ function drawPois(pois) {
                     })'>
                     Delete
                 </button>
+                <p>Change Description</p>
+                <input type="text" id="${rand1}" value="${poi.description}">
+                <button
+                    onclick='mapControl.addModification({
+                        type: "changePoiDescription",
+                        id: "${time}",
+                        description: document.getElementById("${rand1}").value
+                    })'>
+                    Submit
+                </button>
                 <p>Change Google Drive Image ID</p>
-                <input type="text" id="newLink">
+                <input type="text" id="${rand2}">
                 <button
                     onclick='mapControl.addModification({
                         type: "changePoiLink",
                         id: "${time}",
-                        imgId: document.getElementById("newLink").value
+                        imgId: document.getElementById("${rand2}").value
                     })'>
                     Submit
                 </button>
