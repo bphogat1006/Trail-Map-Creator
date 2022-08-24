@@ -2,6 +2,7 @@ class Park {
     constructor() {
         this.trailCollection = {}
         this.pois = []
+        this.infoMarkers = []
         this.intersections = []
     }
 
@@ -19,6 +20,10 @@ class Park {
 
     addPoi(poi) {
         this.pois.push(poi)
+    }
+
+    addInfoMarker(info) {
+        this.infoMarkers.push(info)
     }
 
     addIntersection(intersection) {
@@ -69,12 +74,12 @@ class MapControl {
         opacity: {
             coords: {
                 marker: 0.6,
-                accuracy: 0.3
+                accuracy: 0.15
             },
             trail: 1,
             poi: {
                 img: 0.75,
-                accuracy: 0.1
+                accuracy: 0.07
             }
         }
     }
@@ -82,6 +87,7 @@ class MapControl {
     constructor() {
         this.trailLayers = {}
         this.pois = L.layerGroup()
+        this.infoMarkers = L.layerGroup()
         this.intersections = L.layerGroup()
         this.layerControl = null
         this.editMode = false
@@ -99,6 +105,10 @@ class MapControl {
         this.pois.addLayer(poi)
     }
 
+    addInfoMarker(infoMarker) {
+        this.infoMarkers.addLayer(infoMarker)
+    }
+
     addIntersection(intersection) {
         this.intersections.addLayer(intersection)
     }
@@ -106,6 +116,7 @@ class MapControl {
     getOverlays() {
         var overlays = this.trailLayers
         overlays["POIs"] = this.pois
+        overlays["Info Markers"] = this.infoMarkers
         overlays["Intersections"] = this.intersections
         return overlays
     }
@@ -131,6 +142,7 @@ class MapControl {
         }
         this.trailLayers = {}
         this.pois = L.layerGroup()
+        this.infoMarkers = L.layerGroup()
         this.intersections = L.layerGroup()
         this.layerControl = null
         this.modifications = []
@@ -190,7 +202,7 @@ class MapControl {
                                         break
                                     }
                                 }
-                                data.splice(i, 0, {
+                                data.splice(i, 1, {
                                     header: "START",
                                     trailType: trailType,
                                     time: data[i].time
@@ -211,8 +223,15 @@ class MapControl {
                             }
                         }
                         data.splice(startIndex, 1)
-                        while (startIndex < data.length && data[startIndex].header === "COORDS") {
-                            data.splice(startIndex, 1)
+                        while (startIndex < data.length) {
+                            var header = data[startIndex].header
+                            if (header === "COORDS") {
+                                data.splice(startIndex, 1)
+                            } else if (header === "START") {
+                                break
+                            } else {
+                                startIndex++
+                            }
                         }
                         break;
                         
@@ -268,6 +287,35 @@ class MapControl {
                             }
                         }
                         break;
+                    
+                    // Modify Info Markers
+
+                    case "moveInfoMarker":
+                        for (obj of data) {
+                            if (obj.header === "INFO" && obj.time === modification.id) {
+                                obj.coords = modification.coords
+                                break
+                            }
+                        }
+                        break
+
+                    case "deleteInfoMarker":
+                        for (var i=0; i < data.length; i++) {
+                            if (data[i].header === "INFO" && data[i].time === modification.id) {
+                                data.splice(i, 1)
+                                break
+                            }
+                        }
+                        break
+                        
+                    case "changeInfoDescription":
+                        for (obj of data) {
+                            if (obj.header === "INFO" && obj.time === modification.id) {
+                                obj.description = modification.description
+                                break
+                            }
+                        }
+                        break;
 
                     // Modify intersections
                     
@@ -316,7 +364,7 @@ async function parseDataFile(parkData=null, selectedPark, getParkNamesOnly=false
                     result = Object.keys(json)
                 } else {
                     for (obj of json[selectedPark]) {
-                        if (obj.header === "COORDS" || obj.header === "POI" || obj.header === "INTERSECTION") {
+                        if (obj.header === "COORDS" || obj.header === "POI" || obj.header === "INTERSECTION" || obj.header === "INFO") {
                             obj.accuracy = parseFloat(obj.accuracy)
                             obj.coords = obj.coords.split(",")
                             obj.coords = [parseFloat(obj.coords[0]),parseFloat(obj.coords[1])]

@@ -21,6 +21,10 @@ function drawParkData(data) {
                 park.addPoi(obj)
                 break;
         
+            case "INFO":
+                park.addInfoMarker(obj)
+                break;
+        
             case "INTERSECTION":
                 park.addIntersection(obj)
                 break;
@@ -47,11 +51,15 @@ function drawParkData(data) {
     // draw pois
     drawPois(park.pois)
 
+    // draw info markers
+    drawInfoMarkers(park.infoMarkers)
+
     // draw intersections
     drawIntersections(park.intersections)
 
     // fly to bounds
     allLatLngs = allLatLngs.concat(park.pois.map(poi => poi.coords))
+    allLatLngs = allLatLngs.concat(park.infoMarkers.map(info => info.coords))
     allLatLngs = allLatLngs.concat(park.intersections.map(intersection => intersection.coords))
     map.flyToBounds(allLatLngs, {duration: (mapControl.editMode) ? 0.01 : 2.5})
 }
@@ -101,7 +109,7 @@ function drawTrail(trail, trailType) {
                 <p>${timeIds[i]}</p>
                 ${createModificationHTML('Delete', 'Delete this coordinate', 'deleteCoords')}
                 ${createModificationHTML('Delete', 'Delete this trail', 'deleteTrail')}
-                ${createModificationHTML('Split', 'Split trail and start a new one at this coordinate', 'splitTrail')}
+                ${createModificationHTML('Split', 'Delete this coordinate and separate trail into two', 'splitTrail')}
                 <p>Change Trail Type</p>
                 <input type="text" id="${rand}">
                 <button
@@ -236,10 +244,93 @@ function drawPois(pois) {
     }
 }
 
+function drawInfoMarkers(infoMarkers) {
+    for (var info of infoMarkers) {
+        iconUrl = "https://drive.google.com/uc?id="
+        description = null
+        switch (info.type) {
+            case "Text":
+                iconUrl += '1IbCnTtj6qICPM5lc3k-PCf7vKeuYv3q-'
+                description = info.description
+                break;
+        
+            case "Parking":
+                iconUrl += '1pwj2xXKGuKKod-PRmGfw2fB3ANua-Vu4'
+                description = "Parking"
+                break;
+        
+            default:
+                throw 'Invalid info marker type';
+        }
+        iconSize = 30
+        iconAnchor = 15
+        icon = L.icon({
+            iconUrl,
+            iconSize: [iconSize, iconSize],
+            iconAnchor: [iconAnchor, iconAnchor]
+        })
+        infoMarker = L.marker(info.coords, {
+            icon,
+            draggable: mapControl.editMode
+        })
+
+        const time = info.time
+        if (mapControl.editMode) {
+            const rand = Math.random()
+            infoMarker.bindPopup(`
+                <p>${time}</p>
+                <p>Delete Info Marker</p>
+                <button
+                    onclick='mapControl.addModification({
+                        type: "deleteInfoMarker",
+                        id: "${time}"
+                    })'>
+                    Delete
+                </button>
+                <p>Change Description</p>
+                <input type="text" id="${rand}" value="${description}">
+                <button
+                    onclick='mapControl.addModification({
+                        type: "changeInfoDescription",
+                        id: "${time}",
+                        description: document.getElementById("${rand}").value
+                    })'>
+                    Submit
+                </button>
+            `)
+            infoMarker.on('dragend', (e) => {
+                newCoords = e.target.getLatLng()
+                newCoords = `${newCoords.lat},${newCoords.lng}`
+                mapControl.addModification({
+                    type: "moveInfoMarker",
+                    id: time,
+                    coords: newCoords
+                })
+            })
+        } else {
+            infoMarker.bindPopup(`
+                <h4 style="
+                    text-align: center;
+                    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;">
+                    ${description}
+                </h4>
+            `)
+        }
+        
+        infoMarker.addTo(map);
+
+        mapControl.addInfoMarker(infoMarker)
+    }
+}
+
 function drawIntersections(intersections) {
     for (var intersection of intersections) {
         iconUrl = "https://drive.google.com/uc?id="
         switch (intersection.numPaths) {
+            case "2":
+                iconUrl += '1qJyQ-im5ffr-Dj-mtS_2uGYIAAB6PAtI'
+                break;
+        
             case "3":
                 iconUrl += '1pdsj2qfeY0D0a8Awh9KwL6EmkwaaQyL5'
                 break;
@@ -289,6 +380,14 @@ function drawIntersections(intersections) {
                     coords: newCoords
                 })
             })
+        } else {
+            intersectionMarker.bindPopup(`
+                <h4 style="
+                    text-align: center;
+                    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;">
+                    ${intersection.numPaths} paths intersect here
+                </h4>
+            `)
         }
         
         intersectionMarker.addTo(map);
