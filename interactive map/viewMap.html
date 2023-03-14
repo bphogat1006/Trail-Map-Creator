@@ -17,7 +17,7 @@
     <link type="text/css" rel="stylesheet" type="text/css" src="autotoolsstyle.css">
     <meta name="autotoolswebscreen" type="variablejs" id="userLocation" label="Current User Location" description="The coordinates of the user's current location, separated by a comma (,)" />
     <meta name="autotoolswebscreen" type="variablejs" id="userLocationAccuracy" label="Location Accuracy" description="The accuracy of the current location in meters" />
-    <meta name="autotoolswebscreen" type="variablejs" id="taskerData" label="Park Data" description="The contents of 'coords.txt' file" />
+    <meta name="autotoolswebscreen" type="variablejs" id="taskerData" label="Park Data" description="The contents of 'coords.json' file" />
     
     <title>View Trail Map</title>
 </head>
@@ -150,21 +150,17 @@
             
             // set up base map layers
             var outdoorsMap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-                maxZoom: 23,
+                maxZoom: 22,
                 attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
                     'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
                 id: 'mapbox/outdoors-v11',
                 tileSize: 512,
                 zoomOffset: -1
             }).addTo(map)
-            var satelliteMap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-                maxZoom: 23,
-                attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
-                    'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-                id: 'mapbox/satellite-v9',
-                tileSize: 512,
-                zoomOffset: -1
-            })
+            var satelliteMap = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+                maxZoom: 22,
+                subdomains:['mt0','mt1','mt2','mt3']
+            });
             L.control.layers({
                 "Street": outdoorsMap,
                 "Satellite": satelliteMap

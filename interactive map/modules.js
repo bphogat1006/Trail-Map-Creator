@@ -74,7 +74,7 @@ class MapControl {
         opacity: {
             coords: {
                 marker: 0.6,
-                accuracy: 0.15
+                accuracy: 0.07
             },
             trail: 1,
             poi: {
@@ -379,7 +379,7 @@ async function parseDataFile(parkData=null, selectedPark, getParkNamesOnly=false
     }
 
     if (parkData === null) {
-        return fetch("coords.txt")
+        return fetch("coords.json")
             .then(response => response.text())
             .then(text => {
                 return parseData(text)
