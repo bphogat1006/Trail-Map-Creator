@@ -1,4 +1,8 @@
+.vscode
+*.code-workspace
+.venv
+test
+*.csv
+*.log
 coords.json
 viewMapMobile.html
-*.code-workspace
-pico/

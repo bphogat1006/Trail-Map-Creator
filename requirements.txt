@@ -1,0 +1,11 @@
+geographiclib==2.0
+geopy==2.3.0
+numpy==1.24.2
+pandas==1.5.3
+pyreadline==2.1
+pyserial==3.5
+python-dateutil==2.8.2
+pytz==2022.7.1
+pyudev==0.24.0
+rshell==0.0.31
+six==1.16.0
