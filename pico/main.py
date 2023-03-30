@@ -49,7 +49,7 @@ def changeState(newState):
 # log cooords to file
 def startLoggingGPS(log_description):
     log_description = log_description.strip().replace('+', '-')
-    log_filename = f'logs/TMC_{log_description}_{gps.getTime()%1000}.csv'
+    log_filename = f'logs/TMC_{log_description}_{gps.getTime()}.csv'
     print('opening new log:', log_filename)
     gps.update(3) # let app return html page
     with open(log_filename, 'w') as log:
@@ -82,6 +82,7 @@ app.add_route('/', 'GET', home)
 
 def track(request: pss.Request):
     paramDict = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
+    print(paramDict)
     if 'stop' in paramDict.keys():
         changeState(STOPPING)
         while CURR_STATE != IDLE:
