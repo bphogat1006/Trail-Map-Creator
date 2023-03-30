@@ -1,3 +1,4 @@
+import os
 from utime import sleep
 from machine import UART, Pin, reset
 from _thread import start_new_thread
@@ -34,7 +35,7 @@ while 0:
 
 # state vars
 IDLE = 'IDLE'
-RECORDING = 'RECORDING'
+TRACKING = 'TRACKING'
 STOPPING = 'STOPPING'
 
 # current state
@@ -47,8 +48,8 @@ def changeState(newState):
 
 # log cooords to file
 def startLoggingGPS(log_description):
-    log_description = log_description.strip().replace('+', '_')
-    log_filename = f'logs/{log_description}_{gps.getTime()%1000}.csv'
+    log_description = log_description.strip().replace('+', '-')
+    log_filename = f'logs/TMC_{log_description}_{gps.getTime()%1000}.csv'
     print('opening new log:', log_filename)
     gps.update(3) # let app return html page
     with open(log_filename, 'w') as log:
@@ -73,14 +74,53 @@ def startLoggingGPS(log_description):
 # init web app
 app = pss.App()
 
-def home(request_body):
-    body = pss.get_html_template('home.html', {
-        'CURR_STATE': CURR_STATE
-    })
+def home(request: pss.Request):
+    body = pss.get_html_template('home.html')
+    body = body.replace('CURR_STATE', CURR_STATE)
     return pss.generate_response(title='TMC Home', body=body)
 app.add_route('/', 'GET', home)
 
-def debug(request_body):
+def track(request: pss.Request):
+    paramDict = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
+    if 'stop' in paramDict.keys():
+        changeState(STOPPING)
+        while CURR_STATE != IDLE:
+            pass
+    else:
+        changeState(TRACKING)
+        start_new_thread(startLoggingGPS, (paramDict['filename'],))
+    return pss.redirect('/')
+app.add_route('/track', 'post', track)
+
+def view_tracks(request: pss.Request):
+    downloadPage = pss.get_html_template('download.html')
+    filenames = [file for file in os.listdir('logs')]
+    downloadPage = downloadPage.replace('FILENAMES', ','.join(filenames))
+    return pss.generate_response(body=downloadPage)
+app.add_route('/view_tracks', 'GET', view_tracks)
+
+def download(request: pss.Request):
+    print(request.args)
+    filename = request.args["filename"].replace('%20', ' ')
+    fileData = None
+    with open(f'logs/{filename}', 'r') as f:
+        fileData = f.read()
+    headers = {
+        'Content-Disposition': f'attachment; filename="{filename}"',
+    }
+    return pss.generate_response(html=fileData, response_headers=headers)
+app.add_route('/download', 'GET', download)
+
+def loc(request: pss.Request):
+    gps.update(2, led)
+    lat, long = gps.latlong()
+    latlong = f'{lat},{long}'
+    link = f'https://www.google.com/maps/search/{latlong}'
+    atag = f'<a href="{link}" target="_blank">{latlong}</a>'
+    return pss.generate_response(body=atag)
+app.add_route('/loc', 'GET', loc)
+
+def debug(request: pss.Request):
     gps.update(3, led)
     debugInfo = gps.getDebugInfo().replace('\n', '<br>')
     body = f'''
@@ -89,27 +129,6 @@ def debug(request_body):
     '''
     return pss.generate_response(body=body)
 app.add_route('/debug', 'get', debug)
-
-def record(request_body):
-    paramDict = dict((param.split('=')[0], param.split('=')[1]) for param in request_body.split('&'))
-    if 'stop' in paramDict.keys():
-        changeState(STOPPING)
-        while CURR_STATE != IDLE:
-            pass
-    else:
-        changeState(RECORDING)
-        start_new_thread(startLoggingGPS, (paramDict['filename'],))
-    return pss.redirect('/')
-app.add_route('/record', 'post', record)
-
-def loc(request_body):
-    gps.update(2, led)
-    lat, long = gps.latlong()
-    latlong = f'{lat},{long}'
-    link = f'https://www.google.com/maps/search/{latlong}'
-    atag = f'<a href="{link}" target="_blank">{latlong}</a>'
-    return pss.generate_response(body=atag)
-app.add_route('/loc', 'GET', loc)
 
 # ready
 led.on()

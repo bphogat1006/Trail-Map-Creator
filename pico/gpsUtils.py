@@ -1,4 +1,5 @@
 from utime import sleep, mktime
+from machine import RTC
 from micropyGPS import MicropyGPS
 
 #####################################################
@@ -11,6 +12,7 @@ class GPS:
         self.reader = MicropyGPS()
         self._gotInitialFix = False
         self.debug = debug
+        self.rtc = RTC()
 
     # get serial data from UART
     def _read_UART(self):
@@ -71,11 +73,17 @@ class GPS:
 
     # get location fix
     def init(self):
+        self.update(1)
         while self.reader.time_since_fix() == -1:
             print('Waiting for GPS fix...')
             sleep(1.1)
             self.update(1)
         self._gotInitialFix = True
+        # set RTC
+        self.update(2)
+        day, month, year, hour, minute, second = [int(x) for x in list(self.reader.date) + self.reader.timestamp]
+        datetime = (year+2000, month, day, None, hour, minute, second, 0)
+        self.rtc.datetime(datetime)
         print('GPS fix obtained')
 
     # continuously track
@@ -133,8 +141,8 @@ class GPS:
             sleep(interval)
 
     def getTime(self):
-        day, month, year, hour, minute, second = [int(x) for x in list(self.reader.date) + self.reader.timestamp]
-        datetime = (year+2000, month, day, hour, minute, second, 0, 0)
+        year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
+        datetime = (year, month, day, hour, minute, second, 0, 0)
         return mktime(datetime)
 
     def logError(self, err):

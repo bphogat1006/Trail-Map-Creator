@@ -4,7 +4,7 @@
 <p>CURR_STATE</p>
 
 <h4>Record a new trail</h4>
-<form action="/record" method="post">
+<form action="/track" method="post">
     <label for="recording-filename">Brief description:</label>
     <input type="text" name="filename" id="recording-filename" required>
     <br>
@@ -12,9 +12,14 @@
 </form>
 
 <h4>Stop recording</h4>
-<form action="/record" method="post">
+<form action="/track" method="post">
     <input name="stop" value="stop" hidden>
     <input type="submit" value="Stop">
+</form>
+
+<h4>View Recorded Tracks</h4>
+<form action="/view_tracks">
+    <input type="submit" value="View">
 </form>
 
 <h4>View debugging info</h4>
