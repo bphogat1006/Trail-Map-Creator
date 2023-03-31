@@ -1,5 +1,9 @@
 import socket
 import network
+try:
+    import uasyncio as asyncio
+except ImportError:
+    import asyncio
 import gc
 
 # set up access point
@@ -109,49 +113,44 @@ class App:
         # add route
         self._route_table[f'{route} {method}'] = gen_response_func
 
-    def _send_response(self, client_sock, request: Request):
+    async def _send_response(self, writer: asyncio.StreamWriter, request: Request):
         # generate & send response
         res = None
         if f'{request.route} {request.method}' not in self._route_table.keys():
             print('404 Not Found')
             res = generate_response(status_code=404, status_text='Not Found', title='404', body='404')
         else:
-            res = self._route_table[f'{request.route} {request.method}'](request)
+            res = await self._route_table[f'{request.route} {request.method}'](request)
         response_headline, response_headers_raw, response_body = res
-        client_sock.send(response_headline.encode())
-        client_sock.send(response_headers_raw.encode())
-        client_sock.send('\n'.encode()) # to separate headers from body
-        client_sock.send(response_body.encode())
+        writer.write(response_headline.encode())
+        writer.write(response_headers_raw.encode())
+        writer.write('\n'.encode()) # to separate headers from body
+        writer.write(response_body.encode())
+        await writer.drain()
 
-    def run(self):
-        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        port = 80
-        server_sock.bind(('', port))
-        server_sock.listen(0)
-        print(f'Server running on port {port}')
+    async def server_callback(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        gc.collect()
+        client_addr = writer.get_extra_info('peername')
+        print(f'{client_addr}: New connection request')
 
-        while True:
-            gc.collect()
-            # accept connection
-            print('Accepting connections...')
-            client_sock, client_addr = server_sock.accept()
-            print(f'Got a connection request from {client_addr}')
-            
-            # parse request
-            client_sock.settimeout(0.3)
-            try:
-                buf = client_sock.recv(MAX_RECV).decode()
-            except Exception as e:
-                print(e)
-                client_sock.close()
-                continue
-            request = normalize_line_endings(buf)
-            request = Request(request)
+        # parse request
+        try:
+            buf = await asyncio.wait_for_ms(reader.read(MAX_RECV), 500)
+            buf = buf.decode()
+        except asyncio.TimeoutError:
+            print(f'{client_addr}: Connection timed out, closing.')
+            writer.close()
+            await writer.wait_closed()
+            return
+        
+        request = normalize_line_endings(buf)
+        request = Request(request)
 
-            print(f'{request.method} {request.route} from {client_addr}')
-            print('Sending response!')
-            self._send_response(client_sock, request)
+        print(f'{client_addr}: {request.method} {request.route}')
+        print(f'{client_addr}: Sending response...')
+        await self._send_response(writer, request)
+        print(f'{client_addr}: Response sent!')
 
-            # and closing connection, as we stated before
-            client_sock.close()
+        # close connection
+        writer.close()
+        await writer.wait_closed()

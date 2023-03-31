@@ -1,13 +1,18 @@
-from utime import sleep, mktime
-from machine import RTC
+import utime
+from machine import RTC, UART
+try:
+    import uasyncio as asyncio
+except ImportError:
+    import asyncio
 from micropyGPS import MicropyGPS
+from epaper import EPD_2in7
 
-#####################################################
-# DO NOT USE GPS METHODS BEFORE CALLING .init() FIRST
-#####################################################
+###########################################################
+# DO NOT USE GPS METHODS BEFORE CALLING .initialize() FIRST
+###########################################################
 
 class GPS:
-    def __init__(self, uart, debug=False):
+    def __init__(self, uart: UART, debug=False):
         self.uart = uart
         self.reader = MicropyGPS()
         self._gotInitialFix = False
@@ -15,13 +20,13 @@ class GPS:
         self.rtc = RTC()
 
     # get serial data from UART
-    def _read_UART(self):
+    async def _read_UART(self):
         while 1:
             # wait until there's data available to read from uart
             if self.uart.any() == 0:
                 if self.debug:
                     print('No data to read from UART')
-                sleep(0.1)
+                await asyncio.sleep(0.1)
                 continue
             
             # read uart data
@@ -32,7 +37,7 @@ class GPS:
             except UnicodeError as e:
                 if self.debug:
                     print('Unicode Error while decoding GPS buffer')
-                sleep(0.1)
+                await asyncio.sleep(0.1)
                 continue
             
             # return data
@@ -41,7 +46,7 @@ class GPS:
             return data
 
     # fetch new gps data and update gps.reader
-    def update(self, count, led=None):
+    async def update(self, count, led=None):
         if count == 0:
             if led is not None:
                 led.off()
@@ -51,7 +56,7 @@ class GPS:
                 led.on()
         
         # update gps parser with data
-        data = self._read_UART()
+        data = await self._read_UART()
         for char in data:
             try:
                 self.reader.update(char)
@@ -60,37 +65,39 @@ class GPS:
                 self.logError(err)
         
         # make sure fix was not lost
-        if self._gotInitialFix and (self.reader.time_since_fix() == -1 or self.latlong()[0] == 0.0):
+        if self._gotInitialFix and \
+                (self.reader.time_since_fix() == -1 or self.latlong()[0] == 0.0 or self.latlong()[1] == 0.0):
             err = 'GPS error: fix was lost!\n' + self.getDebugInfo()
             self.logError(err)
             print('Waiting for GPS fix...')
-            # count += 1
+            count += 1
         
         # recurse
         if count > 1:
-            sleep(1.1)
-        self.update(count-1, led)
+            await asyncio.sleep(1.1)
+        await self.update(count-1, led)
 
     # get location fix
-    def init(self):
-        self.update(1)
+    async def initialize(self):
+        # wait for fix
+        print('Waiting for GPS fix...')
+        await self.update(1)
         while self.reader.time_since_fix() == -1:
-            print('Waiting for GPS fix...')
-            sleep(1.1)
-            self.update(1)
+            await asyncio.sleep(1.1)
+            await self.update(1)
         self._gotInitialFix = True
+        await self.update(3)
         # set RTC
-        self.update(2)
         day, month, year, hour, minute, second = [int(x) for x in list(self.reader.date) + self.reader.timestamp]
         datetime = (year+2000, month, day, None, hour, minute, second, 0)
         self.rtc.datetime(datetime)
         print('GPS fix obtained')
 
     # continuously track
-    def start_continuous_tracking(self, interval=1.1):
+    async def start_continuous_tracking(self, interval=1.1):
         while 1:
-            self.update(1)
-            sleep(interval)
+            await self.update(1)
+            await asyncio.sleep(interval)
 
     def latlong(self):
         lat = self.reader.latitude
@@ -118,37 +125,15 @@ class GPS:
         output += '\n'
         return output
 
-    # write debugging info to e-Paper
-    def start_ePaper_debugging(self, epd, interval=20):
-        while 1:
-            self.update(1)
-            output = self.getDebugInfo()
-            if self.debug:
-                print(output)
-            
-            # draw on e-Paper
-            print('drawing on e-Paper')
-            h = 5
-            epd.image4Gray.fill(0xff)
-            outputLines = output.split('\n')
-            for i, line in enumerate(outputLines):
-                for part in line.split(': '):
-                    epd.image4Gray.text(part, 5, h, epd.black)
-                    h += 13
-            epd.EPD_2IN7_4Gray_Display(epd.buffer_4Gray)
-            
-            # delay
-            sleep(interval)
-
-    def getTime(self):
+    def time(self):
         year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
         datetime = (year, month, day, hour, minute, second, 0, 0)
-        return mktime(datetime)
+        return utime.mktime(datetime)
 
     def logError(self, err):
         print(err)
         with open('gps_error.log', 'a') as log:
-            log.write(f'{self.getTime()}: {err}\n')
+            log.write(f'{self.time()}: {err}\n')
 
 
 
