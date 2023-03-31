@@ -3,6 +3,7 @@
 .venv
 test
 *.csv
+*.kml
 *.log
 coords.json
 viewMapMobile.html
