@@ -121,7 +121,6 @@ class GPS:
         output += f'long: {long}\n'
         output += f'speed: {self.reader.speed_string(unit="mph")}\n'
         output += f'direction: {self.reader.compass_direction()}\n'
-        output += '\n'
         return output
 
     def time(self):

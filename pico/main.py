@@ -51,11 +51,12 @@ TRAIL_WIDTH = 1 # 1-5, in meters
 async def change_trail_width():
     recording_interrupted = True if CURR_STATE == TRACKING else False
     if recording_interrupted:
-        stop_recording_trail()
+        await stop_recording_trail()
     # this function intentionally uses blocking sleep statements
     global TRAIL_WIDTH
+    utime.sleep(0.3)
     led.on()
-    utime.sleep(0.5)
+    utime.sleep(0.3)
     def indicate_width():
         print('Trail width:', TRAIL_WIDTH)
         for i in range(TRAIL_WIDTH):
@@ -67,7 +68,7 @@ async def change_trail_width():
     indicate_width()
     while 1:
         if epd.key0.value() == 0:
-            TRAIL_WIDTH -= 1
+            TRAIL_WIDTH = max(1, TRAIL_WIDTH - 1)
             indicate_width()
         elif epd.key1.value() == 0:
             led.off()
@@ -90,42 +91,46 @@ async def start_recording_trail(log_description=''):
         return
     led.on()
     print('Recording new trail')
-    await gps.update(3) # update gps and let app return html page
     change_state(TRACKING)
+    await gps.update(3)
     led.off()
 
     # create log
     log_description = log_description.strip().replace('+', '-') + '_'
-    log_filename = f'tracks/TMC_{log_description}{gps.time()}.csv'
-    print('opening new log:', log_filename)
-    with open(log_filename, 'w') as log:
+    log_filename = f'TMC_{log_description}{gps.time()}.csv'
+    print('Opening new track log:', log_filename)
+    with open('tracks/'+log_filename, 'w') as log:
         log.write('time,latitude,longitude,satellites visible,pdop\n')
     
     # edit tracks.json
-    tracks_json[log_filename] = {'width': TRAIL_WIDTH, 'time': gps.time()}
+    tracks_json[log_filename] = {'width': TRAIL_WIDTH, 'time': gps.time(), 'markers': []}
     dump_tracks_json()
     
     # start tracking
-    epaperDrawInterval = 30 # seconds
-    start = gps.time() - epaperDrawInterval - 1
+    epaperDrawInterval = 20 # seconds
+    startTime = gps.time() - epaperDrawInterval - 1
+    lastPointTime = gps.time()
+    numPointsTotal = 0
+    newPoints = 0
     while 1:
         # update and log
-        await gps.update(1)
+        await gps.update(1, led)
         lat, long = gps.latlong()
         satellitesVisible = len(gps.reader.satellites_visible())
         pdop = gps.reader.pdop
         logEntry = f'{gps.time()},{lat},{long},{satellitesVisible},{pdop}\n'
         print(logEntry)
-        with open(log_filename, 'a') as log:
+        with open('tracks/'+log_filename, 'a') as log:
             log.write(logEntry)
-
-        # trigger led event
-        LED_EVENT.set()
+        lastPointTime = gps.time()
+        numPointsTotal += 1
+        newPoints += 1
 
         # write info to epaper
-        if gps.time() - start > epaperDrawInterval:
-            start = gps.time()
-            epd.run_in_thread(epd.gps_debug, (gps,))
+        if gps.time() - startTime > epaperDrawInterval:
+            startTime = gps.time()
+            epd.run_in_thread(epd.display_tracking_info, (log_filename, gps.time(), gps.time()-lastPointTime, newPoints, numPointsTotal, TRAIL_WIDTH))
+            newPoints = 0
 
         # delay
         if CURR_STATE == STOPPING:
@@ -137,14 +142,19 @@ async def stop_recording_trail():
     led.on()
     if CURR_STATE != TRACKING:
         return
+    print('Stopping trail recording')
     change_state(STOPPING)
     while CURR_STATE != IDLE:
         await asyncio.sleep(0.1)
-    # epaper
-    # TODO
-
-    # finish
+    asyncio.create_task(display_trails())
     led.off()
+
+async def display_trails():
+    while CURR_STATE == IDLE:
+        print('Displaying recorded trails on e-Paper')
+        # TODO
+        break
+        await asyncio.sleep(20)
 
 
 ### Web app ###

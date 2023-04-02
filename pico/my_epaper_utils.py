@@ -4,6 +4,7 @@ try:
     import uasyncio as asyncio
 except ImportError:
     import asyncio
+import utime
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import flash_led
@@ -22,10 +23,10 @@ class EPD():
         self._EPD_READY.set()
 
     def initialize(self, key0_func, key1_func, key2_func): # functions should be async
-        self.epd = EPD_2in7()
         self._key0_func = key0_func
         self._key1_func = key1_func
         self._key2_func = key2_func
+        self.epd = EPD_2in7()
         print('e-Paper ready!')
         
     async def manage_threads(self):
@@ -74,15 +75,39 @@ class EPD():
             h += 13
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
-    # write gps debug info to ePaper
+    # write gps debug info to display
     def gps_debug(self, gps: GPS):
         output = gps.getDebugInfo()
         print('drawing debug info on e-Paper')
         h = 5
         self.epd.image4Gray.fill(0xff)
-        outputLines = output.split('\n')
-        for i, line in enumerate(outputLines):
+        for i, line in enumerate(output.split('\n')):
             for part in line.split(': '):
                 self.epd.image4Gray.text(part, 5, h, self.epd.black)
                 h += 13
+        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+
+    # display tracking information while recording trails
+    def display_tracking_info(self, filename, currTime, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
+        h=5
+        (year, month, mday, hour, minute, second, weekday, yearday) = utime.localtime(currTime)
+        self.epd.image4Gray.fill(0xff)
+        output = 'Filename\n'
+        output += filename + '\n'
+        output += 'Current epoch time\n'
+        output += f'{month}/{mday}/{year}, {hour%12-4}:{minute}:{second}\n'
+        output += 'Time since last point\n'
+        output += str(timeSinceLastPoint) + '\n'
+        output += '# of new points\n'
+        output += str(newPoints) + '\n'
+        output += 'Total # of points\n'
+        output += str(numPointsTotal) + '\n'
+        output += 'Current trail width\n'
+        output += str(trailWidth)
+        for i, line in enumerate(output.split('\n')):
+            if i%2:
+                self.epd.image4Gray.text(line, 5, h, self.epd.darkgray)
+            else:
+                self.epd.image4Gray.text(line, 5, h, self.epd.black)
+            h += 13
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
