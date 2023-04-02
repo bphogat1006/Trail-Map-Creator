@@ -4,24 +4,12 @@ try:
 except ImportError:
     import asyncio
 from machine import UART, Pin
+import utime
+import json
 from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
-
-flash_led()
-
-# Program states
-IDLE = 'IDLE'
-TRACKING = 'TRACKING'
-STOPPING = 'STOPPING'
-# Current state
-CURR_STATE = IDLE
-# to change current state
-def changeState(newState):
-    global CURR_STATE
-    CURR_STATE = newState
-    print('State change:', newState)
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
@@ -34,22 +22,90 @@ LED_EVENT = asyncio.Event()
 async def led_listener():
     while 1:
         await LED_EVENT.wait()
-        flash_led()
+        await flash_led()
         LED_EVENT.clear()
 
+# Program states
+IDLE = 'IDLE'
+TRACKING = 'TRACKING'
+STOPPING = 'STOPPING'
+# Current state
+CURR_STATE = IDLE
+# change current state
+def change_state(newState):
+    global CURR_STATE
+    CURR_STATE = newState
+    print('State change:', newState)
 
-### main functionality ###
+# track JSON data
+with open('tracks.json', 'r') as f:
+    tracks_json = json.load(f)
+def dump_tracks_json():
+    with open('tracks.json', 'w') as f:
+        json.dump(tracks_json, f)
 
-async def record_new_trail(log_description=''):
+
+### Main functionality ###
+
+TRAIL_WIDTH = 1 # 1-5, in meters
+async def change_trail_width():
+    recording_interrupted = True if CURR_STATE == TRACKING else False
+    if recording_interrupted:
+        stop_recording_trail()
+    # this function intentionally uses blocking sleep statements
+    global TRAIL_WIDTH
+    led.on()
+    utime.sleep(0.5)
+    def indicate_width():
+        print('Trail width:', TRAIL_WIDTH)
+        for i in range(TRAIL_WIDTH):
+            led.off()
+            utime.sleep(0.15)
+            led.on()
+            utime.sleep(0.15)
+        utime.sleep(max(0.2, 0.5-TRAIL_WIDTH/10))
+    indicate_width()
+    while 1:
+        if epd.key0.value() == 0:
+            TRAIL_WIDTH -= 1
+            indicate_width()
+        elif epd.key1.value() == 0:
+            led.off()
+            utime.sleep(1)
+            break
+        elif epd.key2.value() == 0:
+            TRAIL_WIDTH += 1
+            indicate_width()
+    if recording_interrupted:
+        asyncio.create_task(start_recording_trail())
+
+async def toggle_trail_recording():
+    if CURR_STATE == IDLE:
+        asyncio.create_task(start_recording_trail())
+    else:
+        asyncio.create_task(stop_recording_trail())
+
+async def start_recording_trail(log_description=''):
     if CURR_STATE != IDLE:
         return
-    await gps.update(3) # let app return html page
-    changeState(TRACKING)
-    log_description = log_description.strip().replace('+', '-')
-    log_filename = f'tracks/TMC_{log_description}_{gps.time()}.csv'
+    led.on()
+    print('Recording new trail')
+    await gps.update(3) # update gps and let app return html page
+    change_state(TRACKING)
+    led.off()
+
+    # create log
+    log_description = log_description.strip().replace('+', '-') + '_'
+    log_filename = f'tracks/TMC_{log_description}{gps.time()}.csv'
     print('opening new log:', log_filename)
     with open(log_filename, 'w') as log:
         log.write('time,latitude,longitude,satellites visible,pdop\n')
+    
+    # edit tracks.json
+    tracks_json[log_filename] = {'width': TRAIL_WIDTH, 'time': gps.time()}
+    dump_tracks_json()
+    
+    # start tracking
     epaperDrawInterval = 30 # seconds
     start = gps.time() - epaperDrawInterval - 1
     while 1:
@@ -73,21 +129,25 @@ async def record_new_trail(log_description=''):
 
         # delay
         if CURR_STATE == STOPPING:
-            changeState(IDLE)
+            change_state(IDLE)
             break
         await asyncio.sleep(2)
 
 async def stop_recording_trail():
+    led.on()
     if CURR_STATE != TRACKING:
         return
-    changeState(STOPPING)
+    change_state(STOPPING)
     while CURR_STATE != IDLE:
         await asyncio.sleep(0.1)
     # epaper
     # TODO
 
+    # finish
+    led.off()
 
-### web app ###
+
+### Web app ###
 
 app = pss.App()
 
@@ -102,7 +162,7 @@ async def track(request: pss.Request):
     if 'stop' in paramDict.keys():
         await stop_recording_trail()
     else:
-        asyncio.create_task(record_new_trail(paramDict['filename']))
+        asyncio.create_task(start_recording_trail(paramDict['filename']))
     return pss.redirect('/')
 app.add_route('/track', 'post', track)
 
@@ -146,15 +206,17 @@ app.add_route('/debug', 'get', debug)
 
 # main
 async def main():
+    await flash_led()
     asyncio.create_task(epd.manage_threads())
     epd.run_in_thread(epd.initialize, (
-        stop_recording_trail, # key0_func
-        record_new_trail, # key1_func
-        stop_recording_trail # key2_func
+        toggle_trail_recording, # key0_func
+        change_trail_width, # key1_func
+        None # key2_func
     ))
     await gps.initialize()
     asyncio.create_task(led_listener())
     asyncio.create_task(epd.key_listener())
+    print('e-Paper key listener ready!')
     server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=1)
     print(f'Server running on port 80')
     led.on()

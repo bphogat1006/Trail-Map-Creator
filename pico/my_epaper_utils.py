@@ -51,15 +51,15 @@ class EPD():
         while 1:
             if self.key0.value() == 0:
                 print('Key 0 pressed')
-                flash_led(3)
+                await flash_led(3)
                 asyncio.create_task(self._key0_func())
             if self.key1.value() == 0:
                 print('Key 1 pressed')
-                flash_led(3)
+                await flash_led(3)
                 asyncio.create_task(self._key1_func())
             if self.key2.value() == 0:
                 print('Key 2 pressed')
-                flash_led(3)
+                await flash_led(3)
                 asyncio.create_task(self._key2_func())
             await asyncio.sleep(0.1)
 

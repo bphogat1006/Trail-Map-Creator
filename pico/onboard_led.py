@@ -1,17 +1,14 @@
 from machine import Pin
-from utime import sleep
+try:
+    import uasyncio as asyncio
+except ImportError:
+    import asyncio
 import _thread
 led = Pin("LED", Pin.OUT)
-
-def flash(count):
+    
+async def flash_led(count=1):
     for i in range(count):
         led.on()
-        sleep(0.2)
+        await asyncio.sleep(0.2)
         led.off()
-        sleep(0.2)
-    
-def flash_led(count=1, synchronous=True):
-    if synchronous:
-        flash(count)
-    else:
-        _thread.start_new_thread(flash, (count))
+        await asyncio.sleep(0.2)
