@@ -5,7 +5,6 @@ try:
 except ImportError:
     import asyncio
 from micropyGPS import MicropyGPS
-from epaper import EPD_2in7
 
 ###########################################################
 # DO NOT USE GPS METHODS BEFORE CALLING .initialize() FIRST
