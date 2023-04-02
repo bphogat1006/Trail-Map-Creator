@@ -127,6 +127,11 @@ class GPS:
         year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
         datetime = (year, month, day, hour, minute, second, 0, 0)
         return utime.mktime(datetime)
+    
+    def timeFormatted(self):
+        year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
+        timeString = f'{month}/{day}/{year}, {hour%12-4}:{minute}:{second}'
+        return timeString
 
     def logError(self, err):
         print(err)

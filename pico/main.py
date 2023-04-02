@@ -129,7 +129,7 @@ async def start_recording_trail(log_description=''):
         # write info to epaper
         if gps.time() - startTime > epaperDrawInterval:
             startTime = gps.time()
-            epd.run_in_thread(epd.display_tracking_info, (log_filename, gps.time(), gps.time()-lastPointTime, newPoints, numPointsTotal, TRAIL_WIDTH))
+            epd.run_in_thread(epd.display_tracking_info, (log_filename, gps.timeFormatted(), gps.time()-lastPointTime, newPoints, numPointsTotal, TRAIL_WIDTH))
             newPoints = 0
 
         # delay

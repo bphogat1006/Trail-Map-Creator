@@ -90,12 +90,11 @@ class EPD():
     # display tracking information while recording trails
     def display_tracking_info(self, filename, currTime, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
         h=5
-        (year, month, mday, hour, minute, second, weekday, yearday) = utime.localtime(currTime)
         self.epd.image4Gray.fill(0xff)
         output = 'Filename\n'
         output += filename + '\n'
         output += 'Current epoch time\n'
-        output += f'{month}/{mday}/{year}, {hour%12-4}:{minute}:{second}\n'
+        output += currTime + '\n'
         output += 'Time since last point\n'
         output += str(timeSinceLastPoint) + '\n'
         output += '# of new points\n'
