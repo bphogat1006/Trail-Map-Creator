@@ -46,13 +46,13 @@ for file in files:
 # Create KML file
 kml = simplekml.Kml()
 for i,track in enumerate(tracks):
-    print(track)
     ls = kml.newlinestring(name=files[i], coords=track)
     ls.altitudemode = simplekml.AltitudeMode.relativetoground
+    ls.linestyle = simplekml.LineStyle(color=simplekml.Color.black, width=3)
 
-
-
-# Save DO NOT COPY TO ANDROID
-with open('utils/generated.kml', 'w') as f:
-    f.write(kml.kml())
+# Save
+output = kml.kml()
+print(output)
+with open(os.path.join(TRACKS_PATH, 'generated.kml'), 'w') as f:
+    f.write(output)
 
