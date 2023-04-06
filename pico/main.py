@@ -36,11 +36,11 @@ def change_state(newState):
 map_properties = {
     'bounds': None,
     'zoom': {
-        # levels are in meters calculated by i * (increment) + (initial)
-        # the last zoom level is max (defined by the map boundaries). It is set by update_map_properties()
-        'levels': [i * 50 + 50 for i in range(3)] + [None],
-        'current': 0
-    }
+        'levels': [200, 400, 'fit'],
+        'current': 2 # zero indexed
+    },
+    'latitudeToMeters': 111190, # NOTE constant for anywhere in the world
+    'longitudeToMeters': 85050, # NOTE depends on which latitude you measure at. This is an approximation for latitude 40.1 N
 }
 
 def save_tracks_json():
@@ -58,6 +58,7 @@ with open('tracks.json', 'r') as f:
 
 def update_map_properties():
     print('Updating map properties')
+    map_properties['bounds'] = None
     tracks = os.listdir('tracks')
     for track in tracks:
         # figure out which columns are which
@@ -102,11 +103,12 @@ def update_map_properties():
                     map_properties['bounds']['right'] = long
 
     # set additional map properties
-    metersBetweenLatitudes = 111190 # NOTE constant for anywhere in the world
-    metersBetweenLongitudes = 85050 # NOTE depends on which latitude you measure at. This is an approximation for latitude 40.1 N
-    map_properties['width'] = (map_properties['bounds']['right']-map_properties['bounds']['left'])# * metersBetweenLongitudes
-    map_properties['height'] = (map_properties['bounds']['top']-map_properties['bounds']['bottom'])# * metersBetweenLatitudes
-    map_properties['zoom']['levels'][-1] = max(map_properties['width'], map_properties['height'])
+    map_properties['bounds']['top'] *= map_properties['latitudeToMeters']
+    map_properties['bounds']['bottom'] *= map_properties['latitudeToMeters']
+    map_properties['bounds']['left'] *= map_properties['longitudeToMeters']
+    map_properties['bounds']['right'] *= map_properties['longitudeToMeters']
+    map_properties['height'] = (map_properties['bounds']['top']-map_properties['bounds']['bottom'])
+    map_properties['width'] = (map_properties['bounds']['right']-map_properties['bounds']['left'])
 
 CURR_TRAIL_WIDTH = 1 # 1-5, in meters
 async def change_trail_width():
@@ -210,6 +212,11 @@ async def stop_recording_trail():
     asyncio.create_task(display_trails())
     led.off()
 
+async def change_zoom_level():
+    currZoomIndex = map_properties['zoom']['current']
+    map_properties['zoom']['current'] = (currZoomIndex + 1) % len(map_properties['zoom']['levels'])
+    print(map_properties['zoom']['levels'][map_properties['zoom']['current']])
+
 async def display_trails():
     tracks = os.listdir('tracks')
     if len(tracks) == 0:
@@ -227,7 +234,7 @@ async def display_trails():
         epd.run_in_thread(epd.draw_trails, (currLatlong, map_properties))
         
         # delay
-        await asyncio.sleep(30)
+        await asyncio.sleep(20) # might have to increase if map data is large
 
 
 ### Web app ###
@@ -294,9 +301,12 @@ async def main():
     # create epaper thread manager and initialize epd
     asyncio.create_task(epd.manage_threads())
     epd.run_in_thread(epd.initialize, (
-        toggle_trail_recording, # key0_func
-        change_trail_width, # key1_func
-        None # key2_func #TODO add_marker()
+        toggle_trail_recording, # key0_shortpress_func
+        toggle_trail_recording, # key0_longpress_func #TODO
+        change_trail_width, # key1_shortpress_func
+        change_trail_width, # key1_longpress_func #TODO
+        change_zoom_level, # key2_shortpress_func
+        change_zoom_level # key2_longpress_func #TODO
     ))
     
     # wait while initializing gps

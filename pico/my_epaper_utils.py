@@ -1,4 +1,5 @@
 from machine import Pin
+import utime
 from _thread import start_new_thread
 try:
     import uasyncio as asyncio
@@ -19,21 +20,24 @@ class EPD():
         self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
         self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
         self.key2 = Pin(2,  Pin.IN, Pin.PULL_UP)
-        self._key0_func = None
-        self._key1_func = None
-        self._key2_func = None
+        self._key0_shortpress_func = None
+        self._key1_shortpress_func = None
+        self._key2_shortpress_func = None
         self._EPD_READY = asyncio.Event()
         self._EPD_READY.set()
 
-    def initialize(self, key0_func, key1_func, key2_func): # functions should be async
-        self._key0_func = key0_func
-        self._key1_func = key1_func
-        self._key2_func = key2_func
+    def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
+        self._key0_shortpress_func = key0_shortpress_func
+        self._key0_longpress_func = key0_longpress_func
+        self._key1_shortpress_func = key1_shortpress_func
+        self._key1_longpress_func = key1_longpress_func
+        self._key2_shortpress_func = key2_shortpress_func
+        self._key2_longpress_func = key2_longpress_func
         self.epd = EPD_2in7()
         print('e-Paper ready!')
         
     async def manage_threads(self):
-        def thread_func(func, args):
+        def thread_shortpress_func(func, args):
             self._EPD_READY.clear()
             func(*args)
             self._EPD_READY.set()
@@ -45,27 +49,52 @@ class EPD():
             await asyncio.sleep(0.1) # give time for thread to exit
             func, args = self._epd_thread_queue.pop(0)
             print('Running e-paper function in thread. Queue length:', len(self._epd_thread_queue))
-            EPD_THREAD = start_new_thread(thread_func, (func, args))
+            EPD_THREAD = start_new_thread(thread_shortpress_func, (func, args))
 
     def run_in_thread(self, func: function, args=tuple()):
         self._epd_thread_queue.append((func, args))
         print('Added function to e-paper thread queue of length', len(self._epd_thread_queue))
 
     async def key_listener(self):
+        sleepInterval = 0.3
         while 1:
+            
             if self.key0.value() == 0:
                 print('Key 0 pressed')
                 await flash_led(3)
-                asyncio.create_task(self._key0_func())
+                if self.key0.value() == 0:
+                    # run long press task
+                    utime.sleep(sleepInterval)
+                    await flash_led(3)
+                    asyncio.create_task(self._key0_longpress_func())
+                else:
+                    # run short press task
+                    asyncio.create_task(self._key0_shortpress_func())
+                    
             if self.key1.value() == 0:
                 print('Key 1 pressed')
                 await flash_led(3)
-                asyncio.create_task(self._key1_func())
+                if self.key1.value() == 0:
+                    # run long press task
+                    utime.sleep(sleepInterval)
+                    await flash_led(3)
+                    asyncio.create_task(self._key1_longpress_func())
+                else:
+                    # run short press task
+                    asyncio.create_task(self._key1_shortpress_func())
+                    
             if self.key2.value() == 0:
                 print('Key 2 pressed')
                 await flash_led(3)
-                asyncio.create_task(self._key2_func())
-            await asyncio.sleep(0.1)
+                if self.key2.value() == 0:
+                    # run long press task
+                    utime.sleep(sleepInterval)
+                    await flash_led(3)
+                    asyncio.create_task(self._key2_longpress_func())
+                else:
+                    # run short press task
+                    asyncio.create_task(self._key2_shortpress_func())
+            await asyncio.sleep(sleepInterval)
 
 
     ### Miscellaneous functions ###
@@ -115,17 +144,38 @@ class EPD():
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
     def draw_trails(self, currLatlong, map_properties):
-        # transformation function from (lat, long) to (x, y) coordinates
+
+        # transformation functions from (lat, long) to (x, y) coordinates
+        currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
         scalingFactor = None
-        mapAspectRatio = map_properties['width'] / map_properties['height']
-        displayAspectRatio = self.width / self.height
-        if mapAspectRatio > displayAspectRatio:
-            scalingFactor = self.width / map_properties['width']
+        if currZoom == 'fit':
+            mapAspectRatio = map_properties['width'] / map_properties['height']
+            displayAspectRatio = self.width / self.height
+            if mapAspectRatio > displayAspectRatio:
+                scalingFactor = self.width / map_properties['width']
+            else:
+                scalingFactor = self.height / map_properties['height']
         else:
-            scalingFactor = self.height / map_properties['height']
-        def transform(lat, long): # lat: 
+            scalingFactor = self.width / currZoom
+
+        def scale(lat, long):
+            lat *= map_properties['latitudeToMeters']
+            long *= map_properties['longitudeToMeters']
             y = self.height - (lat - map_properties['bounds']['bottom']) * scalingFactor
             x = (long - map_properties['bounds']['left']) * scalingFactor
+            return x, y
+        
+        currPos = scale(*currLatlong)
+        # center map on current coords
+        def translate(x, y):
+            if currZoom != 'fit':
+                x += self.width/2 - currPos[0]
+                y += self.height/2 - currPos[1]
+            return x, y
+        
+        def transform(lat, long):
+            x, y = scale(lat, long)
+            x, y = translate(x, y)
             return int(x), int(y)
         
         # get and draw tracks in subsets by trail width, descending
@@ -166,13 +216,11 @@ class EPD():
                         lat = float(parts[latCol])
                         long = float(parts[longCol])
                         curr = transform(lat, long)
-                        if curr[0] > self.width:
-                            print(curr)
                         # draw line
                         if prev is not None:
                             # skip if point is redundant or an outlier
                             dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
-                            if dist <= 1:# or dist > 15:
+                            if dist <= 2:# or dist > 15:
                                 continue
                             self.epd.image4Gray.line(*prev, *curr, self.epd.black)
                         prev = curr
@@ -181,9 +229,15 @@ class EPD():
             gc.collect()
         
         # draw current position
-        pos = transform(*currLatlong)
         radius = 3
-        self.epd.image4Gray.ellipse(*pos, 3, 3, self.epd.darkgray, True)
+        currPos = transform(*currLatlong)
+        self.epd.image4Gray.ellipse(*currPos, 3, 3, self.epd.darkgray)
+
+        # info text
+        if currZoom == 'fit':
+            self.epd.image4Gray.text(f'Zoomed to fit', 5, 5, self.epd.lightgray)
+        else:
+            self.epd.image4Gray.text(f'Width of map {currZoom}m', 5, 5, self.epd.lightgray)
 
         # update display
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
