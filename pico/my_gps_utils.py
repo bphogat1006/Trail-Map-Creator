@@ -17,6 +17,7 @@ class GPS:
         self._gotInitialFix = False
         self.debug = debug
         self.rtc = RTC()
+        self.timezone_diff = 4 # only used for self.timeFormatted()
 
     # get serial data from UART
     async def _read_UART(self):
@@ -123,14 +124,14 @@ class GPS:
         output += f'direction: {self.reader.compass_direction()}\n'
         return output
 
-    def time(self):
+    def time(self): # does not account for time zone
         year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
         datetime = (year, month, day, hour, minute, second, 0, 0)
         return utime.mktime(datetime)
     
-    def timeFormatted(self):
+    def timeFormatted(self): # accounts for time zone
         year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
-        timeString = f'{month}/{day}/{year}, {hour%12-4}:{minute}:{second}'
+        timeString = f'{month}/{day}/{year}, {(hour-self.timezone_diff)%12}:{minute}:{second}'
         return timeString
 
     def logError(self, err):

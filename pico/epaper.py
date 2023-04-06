@@ -161,10 +161,10 @@ class EPD_2in7:
         self.gray_lut_wb = EPD_2in7_gray_lut_wb
         self.gray_lut_bb = EPD_2in7_gray_lut_bb
         
-        self.black = 0x00
         self.white = 0xff
+        self.lightgray = 0x55
         self.darkgray = 0xaa
-        self.grayish = 0x55
+        self.black = 0x00
         
         
         self.spi = SPI(1)
@@ -472,10 +472,10 @@ def epdDemo():
     epd.image4Gray.fill_rect(70, 136, 50, 80, epd.black)
     epd.EPD_2IN7_4Gray_Display(epd.buffer_4Gray)
     epd.delay_ms(500)
-   
+    
     epd.image4Gray.fill_rect(0, 232, 88, 16, epd.black)
     epd.image4Gray.text('GRAY1',24, 236, epd.white)
-    epd.image4Gray.text('GRAY2',24, 252, epd.grayish)
+    epd.image4Gray.text('GRAY2',24, 252, epd.lightgray)
     epd.image4Gray.text('GRAY3',112, 236, epd.darkgray)
     epd.image4Gray.text('GRAY4',112, 252, epd.black)
     epd.EPD_2IN7_4Gray_Display(epd.buffer_4Gray)
@@ -485,6 +485,3 @@ def epdDemo():
 
     epd.EPD_2IN7_Clear()
     epd.Sleep()
-
-
-
