@@ -47,6 +47,10 @@ def save_tracks_json():
     with open('tracks.json', 'w') as f:
         json.dump(map_properties['tracks'], f)
 
+def save_junctions_json():
+    with open('junctions.json', 'w') as f:
+        json.dump({'junctions': map_properties['junctions']}, f)
+
 with open('tracks.json', 'r') as f:
     tracks_json = json.load(f)
     tracks = os.listdir('tracks')
@@ -56,7 +60,35 @@ with open('tracks.json', 'r') as f:
     map_properties['tracks'] = tracks_json
     save_tracks_json()
 
-def update_map_properties():
+with open('junctions.json', 'r') as f:
+    map_properties['junctions'] = json.load(f)['junctions']
+
+async def add_junction():
+    print('Adding junction')
+    await gps.update(3, led)
+    lat, long = gps.latlong()
+    map_properties['junctions'].append({'lat': lat, 'long': long})
+    save_junctions_json()
+    print('Number of junctions:', len(map_properties['junctions']))
+
+async def delete_junction():
+    print('Deleting junction')
+    await gps.update(3, led)
+    myLat, myLong = gps.latlong()
+    minDist = .0001
+    minDistIndex = -1
+    for i, junction in enumerate(map_properties['junctions']):
+        jLat, jLong = (junction['lat'], junction['long'])
+        dist = ((myLat - jLat) ** 2 + (myLong - jLong) ** 2) ** (1/2)
+        if dist < minDist:
+            dist = minDist
+            minDistIndex = i
+    if minDistIndex != -1:
+        map_properties['junctions'].pop(minDistIndex)
+        save_junctions_json()
+    print('Number of junctions:', len(map_properties['junctions']))
+
+async def update_map_properties():
     print('Updating map properties')
     map_properties['bounds'] = None
     tracks = os.listdir('tracks')
@@ -64,7 +96,7 @@ def update_map_properties():
         # figure out which columns are which
         latCol = None
         longCol = None
-        with open(f'tracks/{track}') as f:
+        with open(f'tracks/{track}', 'r') as f:
             header = f.readline()
             cols = header.split(',')
             for i,col in enumerate(cols):
@@ -76,7 +108,7 @@ def update_map_properties():
                 raise Exception('Unable to parse CSV file:', track)
             
             # parse line by line
-            for line in f:
+            for i,line in enumerate(f):
                 if line.strip() == '':
                     break
                 parts = line.split(',')
@@ -101,6 +133,10 @@ def update_map_properties():
                     map_properties['bounds']['left'] = long
                 if long > map_properties['bounds']['right']:
                     map_properties['bounds']['right'] = long
+
+                if i%10 == 0:
+                    await asyncio.sleep(0.01)
+        await asyncio.sleep(0.01)
 
     # set additional map properties
     map_properties['bounds']['top'] *= map_properties['latitudeToMeters']
@@ -170,14 +206,15 @@ async def start_recording_trail(log_description=''):
     save_tracks_json()
     
     # start tracking
+    startTime = gps.time()
     epaperDrawInterval = 20 # seconds
-    startTime = gps.time() - epaperDrawInterval - 1
+    epaperDrawTime = gps.time() - epaperDrawInterval - 1
     lastPointTime = gps.time()
     numPointsTotal = 0
     newPoints = 0
     while 1:
         # update and log
-        await gps.update(1, led)
+        await gps.update(2, led)
         lat, long = gps.latlong()
         satellitesVisible = len(gps.reader.satellites_visible())
         pdop = gps.reader.pdop
@@ -190,16 +227,17 @@ async def start_recording_trail(log_description=''):
         newPoints += 1
 
         # write info to epaper
-        if gps.time() - startTime > epaperDrawInterval:
-            startTime = gps.time()
-            epd.run_in_thread(epd.display_tracking_info, (log_filename, gps.timeFormatted(), gps.time()-lastPointTime, newPoints, numPointsTotal, CURR_TRAIL_WIDTH))
+        if gps.time() - epaperDrawTime > epaperDrawInterval:
+            epaperDrawTime = gps.time()
+            recordingDuration = gps.time()-startTime
+            epd.run_in_thread(epd.display_tracking_info, (gps.timeFormatted(), recordingDuration, gps.time()-lastPointTime, newPoints, numPointsTotal, CURR_TRAIL_WIDTH))
             newPoints = 0
 
         # delay
         if CURR_STATE == STOPPING:
             change_state(IDLE)
             break
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
 async def stop_recording_trail():
     led.on()
@@ -215,7 +253,7 @@ async def stop_recording_trail():
 async def change_zoom_level():
     currZoomIndex = map_properties['zoom']['current']
     map_properties['zoom']['current'] = (currZoomIndex + 1) % len(map_properties['zoom']['levels'])
-    print(map_properties['zoom']['levels'][map_properties['zoom']['current']])
+    print('Zoom:', map_properties['zoom']['levels'][map_properties['zoom']['current']])
 
 async def display_trails():
     tracks = os.listdir('tracks')
@@ -223,18 +261,17 @@ async def display_trails():
         print("No tracks recorded yet, can't display trails")
         return
     
+    finished_flag = asyncio.ThreadSafeFlag()
     while CURR_STATE == IDLE:
-        update_map_properties()
+        await update_map_properties()
         gc.collect()
         
         # draw trails
         await gps.update(3)
         currLatlong = gps.latlong()
         print('Displaying recorded trails on e-Paper')
-        epd.run_in_thread(epd.draw_trails, (currLatlong, map_properties))
-        
-        # delay
-        await asyncio.sleep(20) # might have to increase if map data is large
+        epd.run_in_thread(epd.draw_trails, (currLatlong, map_properties, finished_flag))
+        await finished_flag.wait()
 
 
 ### Web app ###
@@ -302,11 +339,11 @@ async def main():
     asyncio.create_task(epd.manage_threads())
     epd.run_in_thread(epd.initialize, (
         toggle_trail_recording, # key0_shortpress_func
-        toggle_trail_recording, # key0_longpress_func #TODO
-        change_trail_width, # key1_shortpress_func
-        change_trail_width, # key1_longpress_func #TODO
+        change_trail_width, # key0_longpress_func
+        add_junction, # key1_shortpress_func
+        delete_junction, # key1_longpress_func
         change_zoom_level, # key2_shortpress_func
-        change_zoom_level # key2_longpress_func #TODO
+        None # key2_longpress_func # TODO
     ))
     
     # wait while initializing gps

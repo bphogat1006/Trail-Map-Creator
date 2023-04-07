@@ -120,21 +120,21 @@ class EPD():
         self.self.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
     # display tracking information while recording trails
-    def display_tracking_info(self, filename, currTime, timeSinceLastPoint, newPointsBuffer, numPointsBufferTotal, trailWidth):
+    def display_tracking_info(self, currTime, recordingDuration, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
         h=5
         self.epd.image4Gray.fill(self.epd.white)
-        output = 'Filename\n'
-        output += filename + '\n'
-        output += 'Current time\n'
+        output = 'Current time\n'
         output += currTime + '\n'
+        output += 'Recording duration\n'
+        output += f'{recordingDuration//60} min and {recordingDuration%60} sec' + '\n'
         output += 'Time since last point\n'
-        output += str(timeSinceLastPoint) + '\n'
-        output += '# of new pointsBuffer\n'
-        output += str(newPointsBuffer) + '\n'
-        output += 'Total # of pointsBuffer\n'
-        output += str(numPointsBufferTotal) + '\n'
+        output += f'{timeSinceLastPoint} seconds' + '\n'
+        output += '# of new points\n'
+        output += str(newPoints) + '\n'
+        output += 'Total # of points\n'
+        output += str(numPointsTotal) + '\n'
         output += 'Current trail width\n'
-        output += str(trailWidth)
+        output += f'{trailWidth} meters'
         for i, line in enumerate(output.split('\n')):
             if i%2:
                 self.epd.image4Gray.text(line, 5, h, self.epd.darkgray)
@@ -143,7 +143,7 @@ class EPD():
             h += 13
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
-    def draw_trails(self, currLatlong, map_properties):
+    def draw_trails(self, currLatlong, map_properties, finished_flag: asyncio.ThreadSafeFlag):
 
         # transformation functions from (lat, long) to (x, y) coordinates
         currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
@@ -179,7 +179,7 @@ class EPD():
             return int(x), int(y)
         
         # get and draw tracks in subsets by trail width, descending
-        # dilation is applied after each subset is drawn to achieve drawing line thickness
+        # dilate_image is applied after each subset is drawn to achieve drawing line thickness
         tracks = map_properties['tracks'].keys()
         maxWidth = 0
         for track in tracks:
@@ -196,7 +196,7 @@ class EPD():
                 # figure out which columns are which
                 latCol = None
                 longCol = None
-                with open(f'tracks/{track}') as f:
+                with open(f'tracks/{track}', 'r') as f:
                     header = f.readline()
                     cols = header.split(',')
                     for i,col in enumerate(cols):
@@ -225,8 +225,13 @@ class EPD():
                             self.epd.image4Gray.line(*prev, *curr, self.epd.black)
                         prev = curr
             if currWidth != 1:
-                self.dilation(self.epd.black)
+                self.dilate_image(self.epd.black)
             gc.collect()
+
+        # draw junctions
+        for junction in map_properties['junctions']:
+            x, y = transform(junction['lat'], junction['long'])
+            self.epd.image4Gray.text('x', x-3, y-4, self.epd.lightgray)
         
         # draw current position
         radius = 3
@@ -235,14 +240,14 @@ class EPD():
 
         # info text
         if currZoom == 'fit':
-            self.epd.image4Gray.text(f'Zoomed to fit', 5, 5, self.epd.lightgray)
-        else:
-            self.epd.image4Gray.text(f'Width of map {currZoom}m', 5, 5, self.epd.lightgray)
+            currZoom = f'{map_properties["width"]}'
+        self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.lightgray)
 
         # update display
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        finished_flag.set()
 
-    def dilation(self, color):
+    def dilate_image(self, color):
         pointsBuffer = []
         def draw_kernel(x, y):
             self.epd.image4Gray.pixel(x+1, y, color)
