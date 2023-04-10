@@ -17,7 +17,10 @@ class GPS:
         self._gotInitialFix = False
         self.debug = debug
         self.rtc = RTC()
+        # custom vars
         self.timezone_diff = 4 # only used for self.timeFormatted()
+        self.distBetweenLatitudes = 111190 # NOTE constant for anywhere in the world
+        self.distBetweenLongitudes = 85050 # NOTE depends on which latitude you measure at. This is an approximation for latitude 40.1 N
 
     # get serial data from UART
     async def _read_UART(self):
@@ -139,7 +142,14 @@ class GPS:
         with open('gps_error.log', 'a') as log:
             log.write(f'{self.time()}: {err}\n')
 
+    def latToMeters(self, lat):
+        return lat * self.distBetweenLatitudes
 
+    def longToMeters(self, long):
+        return long * self.distBetweenLongitudes
 
-
+    def dist(self, latlong1, latlong2): # return distance in meters
+        y1, x1 = latlong1
+        y2, x2 = latlong2
+        return ( self.longToMeters(x1 - x2) ** 2 + self.latToMeters(y1 - y2) ** 2 ) ** 0.5
 

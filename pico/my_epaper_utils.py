@@ -98,14 +98,6 @@ class EPD():
 
 
     ### Miscellaneous functions ###
-    def write_text(self, text):
-        h = 5
-        self.epd.image4Gray.fill(self.epd.white)
-        outputLines = text.split('\n')
-        for i, line in enumerate(outputLines):
-            self.epd.image4Gray.text(line, 5, h, self.epd.black)
-            h += 13
-        self.self.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
     # write gps debug info to display
     def gps_debug(self, gps: GPS):
@@ -143,7 +135,7 @@ class EPD():
             h += 13
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
-    def draw_trails(self, currLatlong, map_properties, finished_flag: asyncio.ThreadSafeFlag):
+    def draw_trails(self, gps: GPS, map_properties, finished_flag: asyncio.ThreadSafeFlag):
 
         # transformation functions from (lat, long) to (x, y) coordinates
         currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
@@ -159,12 +151,13 @@ class EPD():
             scalingFactor = self.width / currZoom
 
         def scale(lat, long):
-            lat *= map_properties['latitudeToMeters']
-            long *= map_properties['longitudeToMeters']
+            lat = gps.latToMeters(lat)
+            long = gps.longToMeters(long)
             y = self.height - (lat - map_properties['bounds']['bottom']) * scalingFactor
             x = (long - map_properties['bounds']['left']) * scalingFactor
             return x, y
         
+        currLatlong = gps.latlong()
         currPos = scale(*currLatlong)
         # center map on current coords
         def translate(x, y):
@@ -231,17 +224,25 @@ class EPD():
         # draw junctions
         for junction in map_properties['junctions']:
             x, y = transform(junction['lat'], junction['long'])
+            self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.lightgray)
             self.epd.image4Gray.text('x', x-3, y-4, self.epd.lightgray)
+
+        # draw markers
+        for marker in map_properties['markers']:
+            x, y = transform(marker['lat'], marker['long'])
+            self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.darkgray)
+            self.epd.image4Gray.text('i', x-4, y-3, self.epd.darkgray)
         
         # draw current position
-        radius = 3
         currPos = transform(*currLatlong)
-        self.epd.image4Gray.ellipse(*currPos, 3, 3, self.epd.darkgray)
+        self.epd.image4Gray.line(currPos[0]-4, currPos[1], currPos[0]+4, currPos[1], self.epd.black)
+        self.epd.image4Gray.line(currPos[0], currPos[1]-4, currPos[0], currPos[1]+4, self.epd.black)
+        self.epd.image4Gray.ellipse(*currPos, 3, 3, self.epd.black)
 
         # info text
         if currZoom == 'fit':
-            currZoom = f'{map_properties["width"]}'
-        self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.lightgray)
+            currZoom = round(map_properties["width"])
+        self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.darkgray)
 
         # update display
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
@@ -262,3 +263,28 @@ class EPD():
                     draw_kernel(*pointsBuffer.pop(0))
         for p in pointsBuffer:
             draw_kernel(*p)
+
+    def view_markers(self, gps: GPS, markers, search_range):
+        self.epd.image4Gray.fill(self.epd.white)
+        currLatlong = gps.latlong()
+        h = 5
+        self.epd.image4Gray.text('Markers', 5, h, self.epd.black)
+        h += 13
+        self.epd.image4Gray.text(f'{len(markers)} within {search_range}m', 5, h, self.epd.black)
+        h += 13
+        for marker in markers:
+            # write marker location
+            xDist = round(gps.longToMeters(currLatlong[1] - marker['long']))
+            yDist = round(gps.longToMeters(currLatlong[0] - marker['lat']))
+            xDirection = 'West' if xDist > 0 else 'East'
+            yDirection = 'South' if yDist > 0 else 'North'
+            h += 13
+            self.epd.image4Gray.text(f'{abs(xDist)}m {xDirection}, {abs(yDist)}m {yDirection}', 5, h, self.epd.black)
+            # write marker text
+            text = marker['text']
+            lineLength = 20
+            textParts = [text[i:i+lineLength] for i in range(0, len(text), lineLength)]
+            for part in textParts:
+                h += 13
+                self.epd.image4Gray.text(part, 5, h, self.epd.darkgray)
+        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)

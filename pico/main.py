@@ -37,10 +37,8 @@ map_properties = {
     'bounds': None,
     'zoom': {
         'levels': [200, 400, 'fit'],
-        'current': 2 # zero indexed
-    },
-    'latitudeToMeters': 111190, # NOTE constant for anywhere in the world
-    'longitudeToMeters': 85050, # NOTE depends on which latitude you measure at. This is an approximation for latitude 40.1 N
+        'current': 2 # current zoom level, zero indexed
+    }
 }
 
 def save_tracks_json():
@@ -50,6 +48,10 @@ def save_tracks_json():
 def save_junctions_json():
     with open('junctions.json', 'w') as f:
         json.dump({'junctions': map_properties['junctions']}, f)
+
+def save_markers_json():
+    with open('markers.json', 'w') as f:
+        json.dump({'markers': map_properties['markers']}, f)
 
 with open('tracks.json', 'r') as f:
     tracks_json = json.load(f)
@@ -63,6 +65,9 @@ with open('tracks.json', 'r') as f:
 with open('junctions.json', 'r') as f:
     map_properties['junctions'] = json.load(f)['junctions']
 
+with open('markers.json', 'r') as f:
+    map_properties['markers'] = json.load(f)['markers']
+
 async def add_junction():
     print('Adding junction')
     await gps.update(3, led)
@@ -74,19 +79,58 @@ async def add_junction():
 async def delete_junction():
     print('Deleting junction')
     await gps.update(3, led)
-    myLat, myLong = gps.latlong()
-    minDist = .0001
-    minDistIndex = -1
+    currLatLong = gps.latlong()
+    minDist = 50 # meters
+    index = -1
     for i, junction in enumerate(map_properties['junctions']):
-        jLat, jLong = (junction['lat'], junction['long'])
-        dist = ((myLat - jLat) ** 2 + (myLong - jLong) ** 2) ** (1/2)
+        junctionLatLong = (junction['lat'], junction['long'])
+        dist = gps.dist(currLatLong, junctionLatLong)
         if dist < minDist:
-            dist = minDist
-            minDistIndex = i
-    if minDistIndex != -1:
-        map_properties['junctions'].pop(minDistIndex)
+            minDist = dist
+            index = i
+    if index != -1:
+        map_properties['junctions'].pop(index)
         save_junctions_json()
     print('Number of junctions:', len(map_properties['junctions']))
+
+async def add_marker(text):
+    print('Adding marker')
+    await gps.update(3, led)
+    lat, long = gps.latlong()
+    map_properties['markers'].append({'lat': lat, 'long': long, 'text': text})
+    save_markers_json()
+    print('Number of markers:', len(map_properties['markers']))
+
+async def delete_marker():
+    print('Deleting nearest marker')
+    await gps.update(3, led)
+    currLatLong = gps.latlong()
+    minDist = 50 # meters
+    index = -1
+    for i, marker in enumerate(map_properties['markers']):
+        markerLatLong = (marker['lat'], marker['long'])
+        dist = gps.dist(currLatLong, markerLatLong)
+        if dist < minDist:
+            minDist = dist
+            index = i
+    if index != -1:
+        print('Deleting', map_properties['markers'][index])
+        map_properties['markers'].pop(index)
+        save_markers_json()
+    else:
+        print('No marker found nearby')
+
+async def view_markers():
+    print('Viewing nearby markers')
+    await gps.update(3, led)
+    currLatLong = gps.latlong()
+    search_range = 100 # meters
+    markers = []
+    for marker in map_properties['markers']:
+        markerLatLong = (marker['lat'], marker['long'])
+        if gps.dist(currLatLong, markerLatLong) < search_range:
+            markers.append(marker)
+    epd.run_in_thread(epd.view_markers, (gps, markers, search_range))
 
 async def update_map_properties():
     print('Updating map properties')
@@ -139,10 +183,10 @@ async def update_map_properties():
         await asyncio.sleep(0.01)
 
     # set additional map properties
-    map_properties['bounds']['top'] *= map_properties['latitudeToMeters']
-    map_properties['bounds']['bottom'] *= map_properties['latitudeToMeters']
-    map_properties['bounds']['left'] *= map_properties['longitudeToMeters']
-    map_properties['bounds']['right'] *= map_properties['longitudeToMeters']
+    map_properties['bounds']['top'] = gps.latToMeters(map_properties['bounds']['top'])
+    map_properties['bounds']['bottom'] = gps.latToMeters(map_properties['bounds']['bottom'])
+    map_properties['bounds']['left'] = gps.longToMeters(map_properties['bounds']['left'])
+    map_properties['bounds']['right'] = gps.longToMeters(map_properties['bounds']['right'])
     map_properties['height'] = (map_properties['bounds']['top']-map_properties['bounds']['bottom'])
     map_properties['width'] = (map_properties['bounds']['right']-map_properties['bounds']['left'])
 
@@ -268,9 +312,8 @@ async def display_trails():
         
         # draw trails
         await gps.update(3)
-        currLatlong = gps.latlong()
         print('Displaying recorded trails on e-Paper')
-        epd.run_in_thread(epd.draw_trails, (currLatlong, map_properties, finished_flag))
+        epd.run_in_thread(epd.draw_trails, (gps, map_properties, finished_flag))
         await finished_flag.wait()
 
 
@@ -278,29 +321,39 @@ async def display_trails():
 
 app = pss.App()
 
-async def home(request: pss.Request):
+async def approute_home(request: pss.Request):
     body = pss.get_html_template('home.html')
     body = body.replace('CURR_STATE', CURR_STATE)
     return pss.generate_response(title='TMC Home', body=body)
-app.add_route('/', 'GET', home)
+app.add_route('/', 'GET', approute_home)
 
-async def track(request: pss.Request):
-    paramDict = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
-    if 'stop' in paramDict.keys():
+async def approute_track(request: pss.Request):
+    form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
+    if 'stop' in form.keys():
         await stop_recording_trail()
     else:
-        asyncio.create_task(start_recording_trail(paramDict['filename']))
+        asyncio.create_task(start_recording_trail(form['filename']))
     return pss.redirect('/')
-app.add_route('/track', 'post', track)
+app.add_route('/track', 'POST', approute_track)
 
-async def view_tracks(request: pss.Request):
+async def approute_marker(request: pss.Request):
+    form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
+    if 'delete' in form.keys():
+        await delete_marker()
+    else:
+        text = form['marker-text'].replace('+', ' ').strip()
+        await add_marker(text)
+    return pss.redirect('/')
+app.add_route('/marker', 'POST', approute_marker)
+
+async def approute_view_tracks(request: pss.Request):
     downloadPage = pss.get_html_template('download.html')
     filenames = [file for file in os.listdir('tracks')]
     downloadPage = downloadPage.replace('FILENAMES', ','.join(filenames))
     return pss.generate_response(body=downloadPage)
-app.add_route('/view_tracks', 'GET', view_tracks)
+app.add_route('/view_tracks', 'GET', approute_view_tracks)
 
-async def download(request: pss.Request):
+async def approute_download(request: pss.Request):
     filename = request.args["filename"].replace('%20', ' ')
     fileData = None
     with open(f'tracks/{filename}', 'r') as f:
@@ -309,18 +362,18 @@ async def download(request: pss.Request):
         'Content-Disposition': f'attachment; filename="{filename}"',
     }
     return pss.generate_response(html=fileData, response_headers=headers)
-app.add_route('/download', 'GET', download)
+app.add_route('/download', 'GET', approute_download)
 
-async def loc(request: pss.Request):
+async def approute_loc(request: pss.Request):
     await gps.update(2, led)
     lat, long = gps.latlong()
     latlong = f'{lat},{long}'
     link = f'https://www.google.com/maps/search/{latlong}'
     atag = f'<a href="{link}" target="_blank">{latlong}</a>'
     return pss.generate_response(body=atag)
-app.add_route('/loc', 'GET', loc)
+app.add_route('/loc', 'GET', approute_loc)
 
-async def debug(request: pss.Request):
+async def approute_debug(request: pss.Request):
     await gps.update(3, led)
     debugInfo = gps.getDebugInfo().replace('\n', '<br>')
     body = f'''
@@ -328,7 +381,7 @@ async def debug(request: pss.Request):
         {debugInfo}
     '''
     return pss.generate_response(body=body)
-app.add_route('/debug', 'get', debug)
+app.add_route('/debug', 'get', approute_debug)
 
 
 # main
@@ -343,7 +396,7 @@ async def main():
         add_junction, # key1_shortpress_func
         delete_junction, # key1_longpress_func
         change_zoom_level, # key2_shortpress_func
-        None # key2_longpress_func # TODO
+        view_markers # key2_longpress_func
     ))
     
     # wait while initializing gps

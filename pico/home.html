@@ -3,26 +3,45 @@
 <h4>Current state</h4>
 <p>CURR_STATE</p>
 
+<h2>Trails</h2>
+
 <h4>Record a new trail</h4>
-<form action="/track" method="post">
+<form action="/track" method="POST">
     <label for="track-filename">Optional description:</label>
     <input type="text" name="filename" id="track-filename">
     <br>
     <input type="submit" value="Start">
 </form>
 
-<h4>Stop track</h4>
-<form action="/track" method="post">
+<h4>Stop tracking</h4>
+<form action="/track" method="POST">
     <input name="stop" value="stop" hidden>
     <input type="submit" value="Stop">
 </form>
 
+<h2>Markers</h2>
+
+<h4>Add Marker</h4>
+<form action="/marker" method="POST">
+    <label for="marker-text">Marker Description:</label>
+    <input type="text" name="marker-text" id="marker-text" required>
+    <input type="submit" value="Save">
+</form>
+
+<h4>Delete Nearest Marker</h4>
+<form action="/marker" method="POST">
+    <input name="delete" value="delete" hidden>
+    <input type="submit" value="Delete">
+</form>
+
+<h2>Miscellaneous</h2>
+
 <h4>View Recorded Tracks</h4>
-<form action="/view_tracks">
+<form action="/view_tracks" method="GET">
     <input type="submit" value="View">
 </form>
 
 <h4>View debugging info</h4>
-<form action="/debug" method="get">
+<form action="/debug" method="GET">
     <input type="submit" value="View">
 </form>
