@@ -291,3 +291,4 @@ class EPD():
                 h += 13
                 self.epd.image4Gray.text(part, 5, h, self.epd.darkgray)
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        utime.sleep(15)

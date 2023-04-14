@@ -124,7 +124,8 @@ async def view_markers():
     print('Viewing nearby markers')
     await gps.update(3, led)
     currLatLong = gps.latlong()
-    search_range = 100 # meters
+    currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
+    search_range = 1000 if currZoom == 'fit' else currZoom # in meters
     markers = []
     for marker in map_properties['markers']:
         markerLatLong = (marker['lat'], marker['long'])
@@ -313,7 +314,7 @@ async def stop_recording_trail():
 async def change_zoom_level():
     currZoomIndex = map_properties['zoom']['current']
     map_properties['zoom']['current'] = (currZoomIndex + 1) % len(map_properties['zoom']['levels'])
-    print('Zoom:', map_properties['zoom']['levels'][map_properties['zoom']['current']])
+    print('Zoom level:', map_properties['zoom']['levels'][map_properties['zoom']['current']])
 
 async def display_trails():
     tracks = os.listdir('tracks')
