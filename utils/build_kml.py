@@ -4,7 +4,7 @@ import simplekml
 TRACKS_PATH = 'storage/downloads'
 DELETE_AFTER_READ = False
 
-files = [file for file in os.listdir(os.path.expanduser(TRACKS_PATH)) if file.startswith('TMC_')]
+files = [file for file in os.listdir(TRACKS_PATH) if file.startswith('TMC_')]
 print(files)
 
 # parse CSV files
