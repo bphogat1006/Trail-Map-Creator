@@ -36,7 +36,7 @@ def change_state(newState):
 map_properties = {
     'bounds': None,
     'zoom': {
-        'levels': [200, 400, 'fit'],
+        'levels': [300, 800, 'fit'],
         'current': 2 # current zoom level, zero indexed
     }
 }
@@ -150,36 +150,52 @@ async def update_map_properties():
                     longCol = i
             if latCol is None or longCol is None:
                 raise Exception('Unable to parse CSV file:', track)
+            # set seek position to start reading at
+            currSeekPos = f.tell()
             
-            # parse line by line
-            for i,line in enumerate(f):
-                if line.strip() == '':
-                    break
-                parts = line.split(',')
-                lat = float(parts[latCol])
-                long = float(parts[longCol])
-                
-                # set initial map boundaries
-                if map_properties['bounds'] is None:
-                    map_properties['bounds'] = {}
-                    map_properties['bounds']['top'] = lat
-                    map_properties['bounds']['bottom'] = lat
-                    map_properties['bounds']['left'] = long
-                    map_properties['bounds']['right'] = long
-                
-                # NOTE latitude is horizontal, longitude is vertical
-                # update map properties
-                if lat > map_properties['bounds']['top']:
-                    map_properties['bounds']['top'] = lat
-                if lat < map_properties['bounds']['bottom']:
-                    map_properties['bounds']['bottom'] = lat
-                if long < map_properties['bounds']['left']:
-                    map_properties['bounds']['left'] = long
-                if long > map_properties['bounds']['right']:
-                    map_properties['bounds']['right'] = long
+        # parse track line by line, chunk by chunk
+        chunkSize = 20
+        try:
+            while 1:
+                with open(f'tracks/{track}', 'r') as f:
+                    f.seek(currSeekPos)
 
-                if i%10 == 0:
-                    await asyncio.sleep(0.01)
+                    for i in range(chunkSize):
+                        line = f.readline()
+                        if not line:
+                            raise StopIteration
+
+                        if line.strip() == '':
+                            break
+                        parts = line.split(',')
+                        lat = float(parts[latCol])
+                        long = float(parts[longCol])
+                        
+                        # set initial map boundaries
+                        if map_properties['bounds'] is None:
+                            map_properties['bounds'] = {}
+                            map_properties['bounds']['top'] = lat
+                            map_properties['bounds']['bottom'] = lat
+                            map_properties['bounds']['left'] = long
+                            map_properties['bounds']['right'] = long
+                        
+                        # NOTE latitude is horizontal, longitude is vertical
+                        # NOTE latitude increases Northward, longitude increases Eastward
+                        # update map properties
+                        if lat > map_properties['bounds']['top']:
+                            map_properties['bounds']['top'] = lat
+                        if lat < map_properties['bounds']['bottom']:
+                            map_properties['bounds']['bottom'] = lat
+                        if long < map_properties['bounds']['left']:
+                            map_properties['bounds']['left'] = long
+                        if long > map_properties['bounds']['right']:
+                            map_properties['bounds']['right'] = long
+                    
+                    # set new seek position
+                    currSeekPos = f.tell()
+
+        except StopIteration:
+            await asyncio.sleep(0.01)
         await asyncio.sleep(0.01)
 
     # set additional map properties
