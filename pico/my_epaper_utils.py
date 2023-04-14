@@ -202,6 +202,7 @@ class EPD():
                     
                     # parse line by line
                     prev = None
+                    curr = None
                     for line in f:
                         if line.strip() == '':
                             break
@@ -211,12 +212,14 @@ class EPD():
                         curr = transform(lat, long)
                         # draw line
                         if prev is not None:
-                            # skip if point is redundant or an outlier
+                            # skip if point is redundant
                             dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
-                            if dist <= 2:# or dist > 15:
-                                continue
-                            self.epd.image4Gray.line(*prev, *curr, self.epd.black)
-                        prev = curr
+                            if dist >= 2:
+                                self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                                prev = curr
+                        else:
+                            prev = curr
+                    self.epd.image4Gray.line(*prev, *curr, self.epd.black)
             if currWidth != 1:
                 self.dilate_image(self.epd.black)
             gc.collect()
