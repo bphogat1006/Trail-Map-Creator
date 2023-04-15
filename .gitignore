@@ -1,9 +1,8 @@
 .vscode
 *.code-workspace
 .venv
-test
 *.csv
 *.kml
 *.log
-coords.json
-viewMapMobile.html
+interactive map
+test
