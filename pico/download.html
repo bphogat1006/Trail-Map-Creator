@@ -1,10 +1,12 @@
-<button id="download" onclick="run()">Download tracks</button>
+FILENAMES
+<!-- <button id="download" onclick="run()">Download tracks</button>
 
 <div id="filenames"></div>
 
 <script>
     // filenames of gps tracks
     const filenames = 'FILENAMES'.split(',')
+    console.log(filenames)
 
     // create list of gps tracks and add to page
     const div = document.getElementById('filenames')
@@ -20,7 +22,6 @@
             if (filename.trim() === '') continue
             res = await fetch('/download?filename='+filename)
             content = await res.text()
-            // console.log(content)
         
             const link = document.createElement("a");
             const file = new Blob([content], { type: 'text/plain' });
@@ -31,4 +32,4 @@
             URL.revokeObjectURL(link.href);
         }
     }
-</script>
+</script> -->

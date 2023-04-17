@@ -263,7 +263,7 @@ async def start_recording_trail(log_description=''):
         log.write('time,latitude,longitude,satellites visible,pdop\n')
     
     # edit tracks.json
-    map_properties['tracks'][log_filename] = {'width': CURR_TRAIL_WIDTH, 'markers': []}
+    map_properties['tracks'][log_filename] = {'width': CURR_TRAIL_WIDTH}
     save_tracks_json()
     
     # start tracking
@@ -338,22 +338,22 @@ async def display_trails():
 
 app = pss.App()
 
-async def approute_home(request: pss.Request):
+async def app_route_home(request: pss.Request):
     body = pss.get_html_template('home.html')
     body = body.replace('CURR_STATE', CURR_STATE)
     return pss.generate_response(title='TMC Home', body=body)
-app.add_route('/', 'GET', approute_home)
+app.add_route('/', 'GET', app_route_home)
 
-async def approute_track(request: pss.Request):
+async def app_route_track(request: pss.Request):
     form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
     if 'stop' in form.keys():
         await stop_recording_trail()
     else:
         asyncio.create_task(start_recording_trail(form['filename']))
     return pss.redirect('/')
-app.add_route('/track', 'POST', approute_track)
+app.add_route('/track', 'POST', app_route_track)
 
-async def approute_marker(request: pss.Request):
+async def app_route_marker(request: pss.Request):
     form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
     if 'delete' in form.keys():
         await delete_marker()
@@ -361,36 +361,40 @@ async def approute_marker(request: pss.Request):
         text = form['marker-text'].replace('+', ' ').strip()
         await add_marker(text)
     return pss.redirect('/')
-app.add_route('/marker', 'POST', approute_marker)
+app.add_route('/marker', 'POST', app_route_marker)
 
-async def approute_view_tracks(request: pss.Request):
-    downloadPage = pss.get_html_template('download.html')
-    filenames = [file for file in os.listdir('tracks')]
-    downloadPage = downloadPage.replace('FILENAMES', ','.join(filenames))
-    return pss.generate_response(body=downloadPage)
-app.add_route('/view_tracks', 'GET', approute_view_tracks)
+async def app_route_view_tracks(request: pss.Request):
+    filenames = [file for file in os.listdir('tracks')] + ['tracks.json', 'junctions.json', 'markers.json']
+    # downloadPage = pss.get_html_template('download.html')
+    # downloadPage = downloadPage.replace('FILENAMES', ','.join(filenames))
+    # return pss.generate_response(body=downloadPage)
+    return pss.generate_response(html=','.join(filenames))
+app.add_route('/view_tracks', 'GET', app_route_view_tracks)
 
-async def approute_download(request: pss.Request):
+async def app_route_download(request: pss.Request):
     filename = request.args["filename"].replace('%20', ' ')
+    print('Sending file:', filename)
     fileData = None
-    with open(f'tracks/{filename}', 'r') as f:
+    if 'TMC_' in filename: # is a track
+        filename = f'tracks/{filename}'
+    with open(filename, 'r') as f:
         fileData = f.read()
     headers = {
         'Content-Disposition': f'attachment; filename="{filename}"',
     }
     return pss.generate_response(html=fileData, response_headers=headers)
-app.add_route('/download', 'GET', approute_download)
+app.add_route('/download', 'GET', app_route_download)
 
-async def approute_loc(request: pss.Request):
+async def app_route_loc(request: pss.Request):
     await gps.update(2, led)
     lat, long = gps.latlong()
     latlong = f'{lat},{long}'
     link = f'https://www.google.com/maps/search/{latlong}'
     atag = f'<a href="{link}" target="_blank">{latlong}</a>'
     return pss.generate_response(body=atag)
-app.add_route('/loc', 'GET', approute_loc)
+app.add_route('/loc', 'GET', app_route_loc)
 
-async def approute_debug(request: pss.Request):
+async def app_route_debug(request: pss.Request):
     await gps.update(3, led)
     debugInfo = gps.getDebugInfo().replace('\n', '<br>')
     body = f'''
@@ -398,7 +402,7 @@ async def approute_debug(request: pss.Request):
         {debugInfo}
     '''
     return pss.generate_response(body=body)
-app.add_route('/debug', 'get', approute_debug)
+app.add_route('/debug', 'get', app_route_debug)
 
 
 # main
@@ -427,7 +431,7 @@ async def main():
     print('e-Paper key listener ready!')
     
     # start web server
-    server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=1)
+    server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=0)
     print(f'Server running on port 80')
     led.on()
     await server.wait_closed() # serve forever
