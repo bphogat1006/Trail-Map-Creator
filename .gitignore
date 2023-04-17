@@ -3,6 +3,9 @@
 .venv
 *.csv
 *.kml
+*.kmz
 *.log
+*.png
+*.json
 interactive map
 test
