@@ -26,7 +26,7 @@ MAX_RECV = 4096
 
 def normalize_line_endings(s):
     # Convert string containing various line endings like \n, \r or \r\n, to uniform \n.
-    return ''.join((line + '\n') for line in s.splitlines())
+    return '\n'.join(s.splitlines())
 
 def get_html_template(template):
     html = None
@@ -60,10 +60,10 @@ def generate_response(status_code=200, status_text='', response_headers=dict(), 
         'Content-Length': len(response_body),
         'Connection': 'close',
     })
-    response_headers_raw = ''.join(f'{k}: {v}\n' for k, v in response_headers.items())
+    response_headers_raw = '\r\n'.join(f'{k}: {v}' for k, v in response_headers.items())
 
     # Reply as HTTP/1.1 server
-    response_headline = f'HTTP/1.0 {status_code} {status_text}\n'
+    response_headline = f'HTTP/1.0 {status_code} {status_text}\r\n'
 
     return response_headline, response_headers_raw, response_body
 
@@ -73,6 +73,7 @@ def redirect(uri):
 
 class Request:
     def __init__(self, request) -> None:
+        request = normalize_line_endings(request)
         requestParts = request.split('\n\n', 1)
         request_head = requestParts[0]
         self.body = '' if len(requestParts)==1 else requestParts[1]
@@ -124,7 +125,7 @@ class App:
         response_headline, response_headers_raw, response_body = res
         writer.write(response_headline.encode())
         writer.write(response_headers_raw.encode())
-        writer.write('\n'.encode()) # to separate headers from body
+        writer.write('\r\n\r\n'.encode()) # to separate headers from body
         writer.write(response_body.encode())
         await writer.drain()
 
@@ -143,8 +144,7 @@ class App:
             await writer.wait_closed()
             return
         
-        request = normalize_line_endings(buf)
-        request = Request(request)
+        request = Request(buf)
 
         print(f'{client_addr}: {request.method} {request.route}')
         print(f'{client_addr}: Sending response...')
