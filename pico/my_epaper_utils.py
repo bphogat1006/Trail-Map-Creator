@@ -10,7 +10,7 @@ import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import flash_led
-from file_utils import FILE_OPEN_LOCK
+from file_utils import FILE_OPEN_LOCK, TrackReader
 
 class EPD():
     def __init__(self):
@@ -27,7 +27,7 @@ class EPD():
         self._EPD_READY = asyncio.Event()
         self._EPD_READY.set()
 
-    async def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
+    def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
         self._key0_shortpress_func = key0_shortpress_func
         self._key0_longpress_func = key0_longpress_func
         self._key1_shortpress_func = key1_shortpress_func
@@ -191,45 +191,23 @@ class EPD():
             tracks_subset = [track for track in tracks if map_properties['tracks'][track]['width'] == currWidth]
             # draw tracks
             for track in tracks_subset:
-                # figure out which columns are which
-                latCol = None
-                longCol = None
-                async with FILE_OPEN_LOCK:
-                    with open(f'tracks/{track}', 'r') as f:
-                        header = f.readline()
-                        cols = header.split(',')
-                        for i,col in enumerate(cols):
-                            if 'latitude' in col:
-                                latCol = i
-                            elif 'longitude' in col:
-                                longCol = i
-                        if latCol is None or longCol is None:
-                            raise Exception('Unable to parse CSV file:', track)
-                        
-                        # parse line by line
-                        prev = None
-                        curr = None
-                        for line in f:
-                            if line.strip() == '':
-                                break
-                            parts = line.split(',')
-                            lat = float(parts[latCol])
-                            long = float(parts[longCol])
-                            curr = transform(lat, long)
-                            # draw line
-                            if prev is not None:
-                                # skip if point is redundant
-                                dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
-                                if dist >= 2:
-                                    self.epd.image4Gray.line(*prev, *curr, self.epd.black)
-                                    prev = curr
-                            else:
-                                prev = curr
-                        self.epd.image4Gray.line(*prev, *curr, self.epd.black)
-                await asyncio.sleep(0.01)
+                prev = None
+                curr = None
+                async for lat, long in TrackReader(track):
+                    curr = transform(lat, long)
+                    # draw line
+                    if prev is not None:
+                        # skip if point is too close to prev
+                        dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
+                        if dist >= 2:
+                            self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                            prev = curr
+                    else:
+                        prev = curr
+                self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                await asyncio.sleep(0)
             if currWidth != 1:
                 self.dilate_image(self.epd.black)
-            gc.collect()
 
         # draw junctions
         for junction in map_properties['junctions']:

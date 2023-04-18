@@ -11,7 +11,7 @@ from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
-from file_utils import OpenFileSafely
+from file_utils import OpenFileSafely, TrackReader
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
@@ -125,66 +125,27 @@ async def update_map_properties():
     map_properties['bounds'] = None
     tracks = os.listdir('tracks')
     for track in tracks:
-        # figure out which columns are which
-        latCol = None
-        longCol = None
-        async with OpenFileSafely(f'tracks/{track}', 'r') as f:
-            header = f.readline()
-            cols = header.split(',')
-            for i,col in enumerate(cols):
-                if 'latitude' in col:
-                    latCol = i
-                elif 'longitude' in col:
-                    longCol = i
-            if latCol is None or longCol is None:
-                raise Exception('Unable to parse CSV file:', track)
-            # set seek position to start reading at
-            currSeekPos = f.tell()
+        async for lat, long in TrackReader(track):
+            # set initial map boundaries
+            if map_properties['bounds'] is None:
+                map_properties['bounds'] = {}
+                map_properties['bounds']['top'] = lat
+                map_properties['bounds']['bottom'] = lat
+                map_properties['bounds']['left'] = long
+                map_properties['bounds']['right'] = long
             
-        # parse track line by line, chunk by chunk
-        chunkSize = 20
-        try:
-            while 1:
-                async with OpenFileSafely(f'tracks/{track}', 'r') as f:
-                    f.seek(currSeekPos)
-
-                    for i in range(chunkSize):
-                        line = f.readline()
-                        if not line:
-                            raise StopIteration
-
-                        if line.strip() == '':
-                            break
-                        parts = line.split(',')
-                        lat = float(parts[latCol])
-                        long = float(parts[longCol])
-                        
-                        # set initial map boundaries
-                        if map_properties['bounds'] is None:
-                            map_properties['bounds'] = {}
-                            map_properties['bounds']['top'] = lat
-                            map_properties['bounds']['bottom'] = lat
-                            map_properties['bounds']['left'] = long
-                            map_properties['bounds']['right'] = long
-                        
-                        # NOTE latitude is horizontal, longitude is vertical
-                        # NOTE latitude increases Northward, longitude increases Eastward
-                        # update map properties
-                        if lat > map_properties['bounds']['top']:
-                            map_properties['bounds']['top'] = lat
-                        if lat < map_properties['bounds']['bottom']:
-                            map_properties['bounds']['bottom'] = lat
-                        if long < map_properties['bounds']['left']:
-                            map_properties['bounds']['left'] = long
-                        if long > map_properties['bounds']['right']:
-                            map_properties['bounds']['right'] = long
-                    
-                    # set new seek position
-                    currSeekPos = f.tell()
-
-        except StopIteration:
-            await asyncio.sleep(0.01)
-        await asyncio.sleep(0.01)
+            # NOTE latitude is horizontal, longitude is vertical
+            # NOTE latitude increases Northward, longitude increases Eastward
+            # update map properties
+            if lat > map_properties['bounds']['top']:
+                map_properties['bounds']['top'] = lat
+            if lat < map_properties['bounds']['bottom']:
+                map_properties['bounds']['bottom'] = lat
+            if long < map_properties['bounds']['left']:
+                map_properties['bounds']['left'] = long
+            if long > map_properties['bounds']['right']:
+                map_properties['bounds']['right'] = long
+        await asyncio.sleep(0)
 
     # set additional map properties
     map_properties['bounds']['top'] = gps.latToMeters(map_properties['bounds']['top'])
@@ -416,14 +377,14 @@ async def main():
 
     # create epaper thread manager and initialize epd
     asyncio.create_task(epd.manage_threads())
-    epd.run_in_thread(epd.initialize, (
+    epd.run_in_thread(epd.initialize, args=(
         toggle_trail_recording, # key0_shortpress_func
         change_trail_width, # key0_longpress_func
         add_junction, # key1_shortpress_func
         delete_junction, # key1_longpress_func
         change_zoom_level, # key2_shortpress_func
         view_markers # key2_longpress_func
-    ))
+    ), is_async=False)
     
     # wait while initializing gps
     await gps.initialize()
