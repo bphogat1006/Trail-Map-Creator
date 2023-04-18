@@ -136,7 +136,7 @@ class App:
 
         # parse request
         try:
-            buf = await asyncio.wait_for_ms(reader.read(MAX_RECV), 500)
+            buf = await asyncio.wait_for_ms(reader.read(MAX_RECV), 1000)
             buf = buf.decode()
         except asyncio.TimeoutError:
             print(f'{client_addr}: Connection timed out, closing.')

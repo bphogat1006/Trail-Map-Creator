@@ -10,6 +10,7 @@ import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import flash_led
+from open_file_thread_safe import FILE_OPEN_LOCK
 
 class EPD():
     def __init__(self):
@@ -26,7 +27,7 @@ class EPD():
         self._EPD_READY = asyncio.Event()
         self._EPD_READY.set()
 
-    def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
+    async def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
         self._key0_shortpress_func = key0_shortpress_func
         self._key0_longpress_func = key0_longpress_func
         self._key1_shortpress_func = key1_shortpress_func
@@ -37,7 +38,11 @@ class EPD():
         print('e-Paper ready!')
         
     async def manage_threads(self):
-        def thread_shortpress_func(func, args):
+        async def async_thread_func(func, args):
+            self._EPD_READY.clear()
+            await func(*args)
+            self._EPD_READY.set()
+        def sync_thread_func(func, args):
             self._EPD_READY.clear()
             func(*args)
             self._EPD_READY.set()
@@ -47,12 +52,19 @@ class EPD():
                 continue
             await self._EPD_READY.wait()
             await asyncio.sleep(0.1) # give time for thread to exit
-            func, args = self._epd_thread_queue.pop(0)
+            func, args, is_async = self._epd_thread_queue.pop(0)
             print('Running e-paper function in thread. Queue length:', len(self._epd_thread_queue))
-            EPD_THREAD = start_new_thread(thread_shortpress_func, (func, args))
+            if is_async:
+                start_new_thread(asyncio.create_task, (async_thread_func(func, args),))
+            else:
+                start_new_thread(sync_thread_func, (func, args))
 
-    def run_in_thread(self, func: function, args=tuple()):
-        self._epd_thread_queue.append((func, args))
+    def run_in_thread(self, func: function, args=tuple(), is_async=True, priority=False):
+        queue_obj = (func, args, is_async)
+        if priority:
+            self._epd_thread_queue.insert(0, queue_obj)
+        else:
+            self._epd_thread_queue.append(queue_obj)
         print('Added function to e-paper thread queue of length', len(self._epd_thread_queue))
 
     async def key_listener(self):
@@ -99,20 +111,12 @@ class EPD():
 
     ### Miscellaneous functions ###
 
-    # write gps debug info to display
-    def gps_debug(self, gps: GPS):
-        output = gps.getDebugInfo()
-        print('drawing debug info on e-Paper')
-        h = 5
-        self.epd.image4Gray.fill(self.epd.white)
-        for i, line in enumerate(output.split('\n')):
-            for part in line.split(': '):
-                self.epd.image4Gray.text(part, 5, h, self.epd.black)
-                h += 13
-        self.self.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+    # write buffer to display
+    def update_display(self):
+        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
 
     # display tracking information while recording trails
-    def display_tracking_info(self, currTime, recordingDuration, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
+    async def display_tracking_info(self, currTime, recordingDuration, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
         h=5
         self.epd.image4Gray.fill(self.epd.white)
         output = 'Current time\n'
@@ -133,10 +137,9 @@ class EPD():
             else:
                 self.epd.image4Gray.text(line, 5, h, self.epd.black)
             h += 13
-        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        self.run_in_thread(self.update_display, is_async=False, priority=True)
 
-    def draw_trails(self, gps: GPS, map_properties, finished_flag: asyncio.ThreadSafeFlag):
-
+    async def draw_trails(self, gps: GPS, map_properties, finished_flag: asyncio.ThreadSafeFlag):
         # transformation functions from (lat, long) to (x, y) coordinates
         currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
         scalingFactor = None
@@ -189,37 +192,39 @@ class EPD():
                 # figure out which columns are which
                 latCol = None
                 longCol = None
-                with open(f'tracks/{track}', 'r') as f:
-                    header = f.readline()
-                    cols = header.split(',')
-                    for i,col in enumerate(cols):
-                        if 'latitude' in col:
-                            latCol = i
-                        elif 'longitude' in col:
-                            longCol = i
-                    if latCol is None or longCol is None:
-                        raise Exception('Unable to parse CSV file:', track)
-                    
-                    # parse line by line
-                    prev = None
-                    curr = None
-                    for line in f:
-                        if line.strip() == '':
-                            break
-                        parts = line.split(',')
-                        lat = float(parts[latCol])
-                        long = float(parts[longCol])
-                        curr = transform(lat, long)
-                        # draw line
-                        if prev is not None:
-                            # skip if point is redundant
-                            dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
-                            if dist >= 2:
-                                self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                async with FILE_OPEN_LOCK:
+                    with open(f'tracks/{track}', 'r') as f:
+                        header = f.readline()
+                        cols = header.split(',')
+                        for i,col in enumerate(cols):
+                            if 'latitude' in col:
+                                latCol = i
+                            elif 'longitude' in col:
+                                longCol = i
+                        if latCol is None or longCol is None:
+                            raise Exception('Unable to parse CSV file:', track)
+                        
+                        # parse line by line
+                        prev = None
+                        curr = None
+                        for line in f:
+                            if line.strip() == '':
+                                break
+                            parts = line.split(',')
+                            lat = float(parts[latCol])
+                            long = float(parts[longCol])
+                            curr = transform(lat, long)
+                            # draw line
+                            if prev is not None:
+                                # skip if point is redundant
+                                dist = ((curr[0] - prev[0]) ** 2 + (curr[1] - prev[1]) ** 2) ** (1/2)
+                                if dist >= 2:
+                                    self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                                    prev = curr
+                            else:
                                 prev = curr
-                        else:
-                            prev = curr
-                    self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                        self.epd.image4Gray.line(*prev, *curr, self.epd.black)
+                await asyncio.sleep(0.01)
             if currWidth != 1:
                 self.dilate_image(self.epd.black)
             gc.collect()
@@ -248,7 +253,7 @@ class EPD():
         self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.darkgray)
 
         # update display
-        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        self.run_in_thread(self.update_display, is_async=False, priority=True)
         finished_flag.set()
 
     def dilate_image(self, color):
@@ -267,7 +272,7 @@ class EPD():
         for p in pointsBuffer:
             draw_kernel(*p)
 
-    def view_markers(self, gps: GPS, markers, search_range):
+    async def view_markers(self, gps: GPS, markers, search_range):
         self.epd.image4Gray.fill(self.epd.white)
         currLatlong = gps.latlong()
         h = 5

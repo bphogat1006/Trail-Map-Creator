@@ -65,13 +65,13 @@ class GPS:
                 self.reader.update(char)
             except Exception as e:
                 err = f'Error in micropyGPS.update(): {e}'
-                self.logError(err)
+                # self.logError(err)
         
         # make sure fix was not lost
         if self._gotInitialFix and \
                 (self.reader.time_since_fix() == -1 or self.latlong()[0] == 0.0 or self.latlong()[1] == 0.0):
             err = 'GPS error: fix was lost!\n' + self.getDebugInfo()
-            self.logError(err)
+            # self.logError(err)
             print('Waiting for GPS fix...')
             count += 1
         
@@ -139,8 +139,8 @@ class GPS:
 
     def logError(self, err):
         print(err)
-        with open('gps_error.log', 'a') as log:
-            log.write(f'{self.time()}: {err}\n')
+        # with open('gps_error.log', 'a') as log:
+        #     log.write(f'{self.time()}: {err}\n')
 
     def latToMeters(self, lat):
         return lat * self.distBetweenLatitudes

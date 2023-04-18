@@ -11,6 +11,7 @@ from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
+from open_file_thread_safe import OpenFileThreadSafe
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
@@ -30,9 +31,7 @@ def change_state(newState):
     CURR_STATE = newState
     print('State change:', newState)
 
-
-### Main functionality ###
-
+# map properties
 map_properties = {
     'bounds': None,
     'zoom': {
@@ -41,39 +40,27 @@ map_properties = {
     }
 }
 
-def save_tracks_json():
-    with open('tracks.json', 'w') as f:
+
+### Main functionality ###
+
+async def save_tracks_json():
+    async with OpenFileThreadSafe('tracks.json', 'w') as f:
         json.dump(map_properties['tracks'], f)
 
-def save_junctions_json():
-    with open('junctions.json', 'w') as f:
+async def save_junctions_json():
+    async with OpenFileThreadSafe('junctions.json', 'w') as f:
         json.dump({'junctions': map_properties['junctions']}, f)
 
-def save_markers_json():
-    with open('markers.json', 'w') as f:
+async def save_markers_json():
+    async with OpenFileThreadSafe('markers.json', 'w') as f:
         json.dump({'markers': map_properties['markers']}, f)
-
-with open('tracks.json', 'r') as f:
-    tracks_json = json.load(f)
-    tracks = os.listdir('tracks')
-    for track in tracks_json.keys():
-        if track not in tracks:
-            tracks_json.pop(track)
-    map_properties['tracks'] = tracks_json
-    save_tracks_json()
-
-with open('junctions.json', 'r') as f:
-    map_properties['junctions'] = json.load(f)['junctions']
-
-with open('markers.json', 'r') as f:
-    map_properties['markers'] = json.load(f)['markers']
 
 async def add_junction():
     print('Adding junction')
     await gps.update(3, led)
     lat, long = gps.latlong()
     map_properties['junctions'].append({'lat': lat, 'long': long})
-    save_junctions_json()
+    await save_junctions_json()
     print('Number of junctions:', len(map_properties['junctions']))
 
 async def delete_junction():
@@ -90,7 +77,7 @@ async def delete_junction():
             index = i
     if index != -1:
         map_properties['junctions'].pop(index)
-        save_junctions_json()
+        await save_junctions_json()
     print('Number of junctions:', len(map_properties['junctions']))
 
 async def add_marker(text):
@@ -98,7 +85,7 @@ async def add_marker(text):
     await gps.update(3, led)
     lat, long = gps.latlong()
     map_properties['markers'].append({'lat': lat, 'long': long, 'text': text})
-    save_markers_json()
+    await save_markers_json()
     print('Number of markers:', len(map_properties['markers']))
 
 async def delete_marker():
@@ -116,7 +103,7 @@ async def delete_marker():
     if index != -1:
         print('Deleting', map_properties['markers'][index])
         map_properties['markers'].pop(index)
-        save_markers_json()
+        await save_markers_json()
     else:
         print('No marker found nearby')
 
@@ -131,7 +118,7 @@ async def view_markers():
         markerLatLong = (marker['lat'], marker['long'])
         if gps.dist(currLatLong, markerLatLong) < search_range:
             markers.append(marker)
-    epd.run_in_thread(epd.view_markers, (gps, markers, search_range))
+    epd.run_in_thread(epd.view_markers, args=(gps, markers, search_range), is_async=True)
 
 async def update_map_properties():
     print('Updating map properties')
@@ -141,7 +128,7 @@ async def update_map_properties():
         # figure out which columns are which
         latCol = None
         longCol = None
-        with open(f'tracks/{track}', 'r') as f:
+        async with OpenFileThreadSafe(f'tracks/{track}', 'r') as f:
             header = f.readline()
             cols = header.split(',')
             for i,col in enumerate(cols):
@@ -158,7 +145,7 @@ async def update_map_properties():
         chunkSize = 20
         try:
             while 1:
-                with open(f'tracks/{track}', 'r') as f:
+                async with OpenFileThreadSafe(f'tracks/{track}', 'r') as f:
                     f.seek(currSeekPos)
 
                     for i in range(chunkSize):
@@ -259,12 +246,12 @@ async def start_recording_trail(log_description=''):
     log_description = log_description.strip().replace('+', '-') + '_'
     log_filename = f'TMC_{log_description}{gps.time()}.csv'
     print('Opening new track log:', log_filename)
-    with open('tracks/'+log_filename, 'w') as log:
+    async with OpenFileThreadSafe('tracks/'+log_filename, 'w') as log:
         log.write('time,latitude,longitude,satellites visible,pdop\n')
     
     # edit tracks.json
     map_properties['tracks'][log_filename] = {'width': CURR_TRAIL_WIDTH}
-    save_tracks_json()
+    await save_tracks_json()
     
     # start tracking
     startTime = gps.time()
@@ -281,7 +268,7 @@ async def start_recording_trail(log_description=''):
         pdop = gps.reader.pdop
         logEntry = f'{gps.time()},{lat},{long},{satellitesVisible},{pdop}\n'
         print(logEntry)
-        with open('tracks/'+log_filename, 'a') as log:
+        async with OpenFileThreadSafe('tracks/'+log_filename, 'a') as log:
             log.write(logEntry)
         lastPointTime = gps.time()
         numPointsTotal += 1
@@ -291,7 +278,9 @@ async def start_recording_trail(log_description=''):
         if gps.time() - epaperDrawTime > epaperDrawInterval:
             epaperDrawTime = gps.time()
             recordingDuration = gps.time()-startTime
-            epd.run_in_thread(epd.display_tracking_info, (gps.timeFormatted(), recordingDuration, gps.time()-lastPointTime, newPoints, numPointsTotal, CURR_TRAIL_WIDTH))
+            epd.run_in_thread(epd.display_tracking_info,
+                              args=(gps.timeFormatted(), recordingDuration, gps.time()-lastPointTime, newPoints, numPointsTotal, CURR_TRAIL_WIDTH),
+                              is_async=True)
             newPoints = 0
 
         # delay
@@ -330,7 +319,7 @@ async def display_trails():
         # draw trails
         await gps.update(3)
         print('Displaying recorded trails on e-Paper')
-        epd.run_in_thread(epd.draw_trails, (gps, map_properties, finished_flag))
+        epd.run_in_thread(epd.draw_trails, args=(gps, map_properties, finished_flag), is_async=True)
         await finished_flag.wait()
 
 
@@ -377,7 +366,7 @@ async def app_route_download(request: pss.Request):
     fileData = None
     if 'TMC_' in filename: # is a track
         filename = f'tracks/{filename}'
-    with open(filename, 'r') as f:
+    async with OpenFileThreadSafe(filename, 'r') as f:
         fileData = f.read()
     headers = {
         'Content-Disposition': f'attachment; filename="{filename}"',
@@ -408,6 +397,22 @@ app.add_route('/debug', 'get', app_route_debug)
 # main
 async def main():
     await flash_led()
+
+    # load in tracks, junctions, and markers data
+    async with OpenFileThreadSafe('tracks.json', 'r') as f:
+        tracks_json = json.load(f)
+        tracks = os.listdir('tracks')
+        for track in tracks_json.keys():
+            if track not in tracks:
+                tracks_json.pop(track)
+        map_properties['tracks'] = tracks_json
+    await save_tracks_json()
+
+    async with OpenFileThreadSafe('junctions.json', 'r') as f:
+        map_properties['junctions'] = json.load(f)['junctions']
+
+    async with OpenFileThreadSafe('markers.json', 'r') as f:
+        map_properties['markers'] = json.load(f)['markers']
 
     # create epaper thread manager and initialize epd
     asyncio.create_task(epd.manage_threads())
