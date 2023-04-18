@@ -3,9 +3,9 @@ try:
 except ImportError:
     import asyncio
 
-# Custom open function (thread safe)
+# Custom context manager wrapper for open, allows only one file to be open at a time
 FILE_OPEN_LOCK = asyncio.Lock()
-class OpenFileThreadSafe(object):
+class OpenFileSafely(object):
     def __init__(self, file, mode):
         self.file = file
         self.mode = mode

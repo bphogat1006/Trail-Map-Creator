@@ -11,7 +11,7 @@ from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
-from open_file_thread_safe import OpenFileThreadSafe
+from open_file_safely import OpenFileSafely
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
@@ -44,15 +44,15 @@ map_properties = {
 ### Main functionality ###
 
 async def save_tracks_json():
-    async with OpenFileThreadSafe('tracks.json', 'w') as f:
+    async with OpenFileSafely('tracks.json', 'w') as f:
         json.dump(map_properties['tracks'], f)
 
 async def save_junctions_json():
-    async with OpenFileThreadSafe('junctions.json', 'w') as f:
+    async with OpenFileSafely('junctions.json', 'w') as f:
         json.dump({'junctions': map_properties['junctions']}, f)
 
 async def save_markers_json():
-    async with OpenFileThreadSafe('markers.json', 'w') as f:
+    async with OpenFileSafely('markers.json', 'w') as f:
         json.dump({'markers': map_properties['markers']}, f)
 
 async def add_junction():
@@ -128,7 +128,7 @@ async def update_map_properties():
         # figure out which columns are which
         latCol = None
         longCol = None
-        async with OpenFileThreadSafe(f'tracks/{track}', 'r') as f:
+        async with OpenFileSafely(f'tracks/{track}', 'r') as f:
             header = f.readline()
             cols = header.split(',')
             for i,col in enumerate(cols):
@@ -145,7 +145,7 @@ async def update_map_properties():
         chunkSize = 20
         try:
             while 1:
-                async with OpenFileThreadSafe(f'tracks/{track}', 'r') as f:
+                async with OpenFileSafely(f'tracks/{track}', 'r') as f:
                     f.seek(currSeekPos)
 
                     for i in range(chunkSize):
@@ -246,7 +246,7 @@ async def start_recording_trail(log_description=''):
     log_description = log_description.strip().replace('+', '-') + '_'
     log_filename = f'TMC_{log_description}{gps.time()}.csv'
     print('Opening new track log:', log_filename)
-    async with OpenFileThreadSafe('tracks/'+log_filename, 'w') as log:
+    async with OpenFileSafely('tracks/'+log_filename, 'w') as log:
         log.write('time,latitude,longitude,satellites visible,pdop\n')
     
     # edit tracks.json
@@ -268,7 +268,7 @@ async def start_recording_trail(log_description=''):
         pdop = gps.reader.pdop
         logEntry = f'{gps.time()},{lat},{long},{satellitesVisible},{pdop}\n'
         print(logEntry)
-        async with OpenFileThreadSafe('tracks/'+log_filename, 'a') as log:
+        async with OpenFileSafely('tracks/'+log_filename, 'a') as log:
             log.write(logEntry)
         lastPointTime = gps.time()
         numPointsTotal += 1
@@ -366,7 +366,7 @@ async def app_route_download(request: pss.Request):
     fileData = None
     if 'TMC_' in filename: # is a track
         filename = f'tracks/{filename}'
-    async with OpenFileThreadSafe(filename, 'r') as f:
+    async with OpenFileSafely(filename, 'r') as f:
         fileData = f.read()
     headers = {
         'Content-Disposition': f'attachment; filename="{filename}"',
@@ -399,7 +399,7 @@ async def main():
     await flash_led()
 
     # load in tracks, junctions, and markers data
-    async with OpenFileThreadSafe('tracks.json', 'r') as f:
+    async with OpenFileSafely('tracks.json', 'r') as f:
         tracks_json = json.load(f)
         tracks = os.listdir('tracks')
         for track in tracks_json.keys():
@@ -408,10 +408,10 @@ async def main():
         map_properties['tracks'] = tracks_json
     await save_tracks_json()
 
-    async with OpenFileThreadSafe('junctions.json', 'r') as f:
+    async with OpenFileSafely('junctions.json', 'r') as f:
         map_properties['junctions'] = json.load(f)['junctions']
 
-    async with OpenFileThreadSafe('markers.json', 'r') as f:
+    async with OpenFileSafely('markers.json', 'r') as f:
         map_properties['markers'] = json.load(f)['markers']
 
     # create epaper thread manager and initialize epd
