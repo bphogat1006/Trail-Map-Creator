@@ -112,8 +112,10 @@ class EPD():
     ### Miscellaneous functions ###
 
     # write buffer to display
-    def update_display(self):
+    def update_display(self, finished_flag: asyncio.ThreadSafeFlag=None):
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        if finished_flag is not None:
+            finished_flag.set()
 
     # display tracking information while recording trails
     async def display_tracking_info(self, currTime, recordingDuration, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
@@ -253,8 +255,7 @@ class EPD():
         self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.darkgray)
 
         # update display
-        self.run_in_thread(self.update_display, is_async=False, priority=True)
-        finished_flag.set()
+        self.run_in_thread(self.update_display, args=(finished_flag,), is_async=False, priority=True)
 
     def dilate_image(self, color):
         pointsBuffer = []
