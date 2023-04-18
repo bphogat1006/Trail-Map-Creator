@@ -10,7 +10,7 @@ import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import flash_led
-from open_file_safely import FILE_OPEN_LOCK
+from file_utils import FILE_OPEN_LOCK
 
 class EPD():
     def __init__(self):

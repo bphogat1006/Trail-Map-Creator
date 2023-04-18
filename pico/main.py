@@ -11,7 +11,7 @@ from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
-from open_file_safely import OpenFileSafely
+from file_utils import OpenFileSafely
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
