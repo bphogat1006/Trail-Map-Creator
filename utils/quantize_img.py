@@ -5,10 +5,6 @@ from time import time
 # Load image
 img: np.ndarray = cv2.imread('storage/dcim/Tasker/TMC/new.jpg')
 
-# save
-filename = f'TMC_marker_{round(time())}.jpg'
-cv2.imwrite('storage/dcim/Tasker/TMC/'+filename, img)
-
 # convert to grayscale
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 

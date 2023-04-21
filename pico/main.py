@@ -84,9 +84,11 @@ async def add_marker(text):
     print('Adding marker')
     await gps.update(3, led)
     lat, long = gps.latlong()
-    map_properties['markers'].append({'lat': lat, 'long': long, 'text': text})
+    id = str(gps.time()) # ID to link markers to their corresponding images
+    map_properties['markers'].append({'lat': lat, 'long': long, 'text': text.strip(), 'id': id})
     await save_markers_json()
     print('Number of markers:', len(map_properties['markers']))
+    return id
 
 async def delete_marker():
     print('Deleting nearest marker')
@@ -102,7 +104,14 @@ async def delete_marker():
             index = i
     if index != -1:
         print('Deleting', map_properties['markers'][index])
-        map_properties['markers'].pop(index)
+        deleted_marker = map_properties['markers'].pop(index)
+        marker_id = deleted_marker['id']
+        print(marker_id)
+        try:
+            os.remove('marker_imgs/'+marker_id)
+        except Exception as e:
+            print('Failed to delete marker img with ID', marker_id)
+        print('Number of markers:', len(map_properties['markers']))
         await save_markers_json()
     else:
         print('No marker found nearby')
@@ -295,23 +304,33 @@ async def app_route_home(request: pss.Request):
 app.add_route('/', 'GET', app_route_home)
 
 async def app_route_track(request: pss.Request):
-    form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
-    if 'stop' in form.keys():
+    request.parse_form()
+    if 'stop' in request.form.keys():
         await stop_recording_trail()
     else:
-        asyncio.create_task(start_recording_trail(form['filename']))
+        asyncio.create_task(start_recording_trail(request.form['filename']))
     return pss.redirect('/')
 app.add_route('/track', 'POST', app_route_track)
 
-async def app_route_marker(request: pss.Request):
-    form = dict((param.split('=')[0], param.split('=')[1]) for param in request.body.split('&'))
-    if 'delete' in form.keys():
+async def app_route_add_marker(request: pss.Request):
+    request.parse_form()
+    if 'delete' in request.form.keys():
         await delete_marker()
     else:
-        text = form['marker-text'].replace('+', ' ').strip()
+        text = request.form['marker-text'].replace('+', ' ').strip()
         await add_marker(text)
     return pss.redirect('/')
-app.add_route('/marker', 'POST', app_route_marker)
+app.add_route('/marker', 'POST', app_route_add_marker)
+
+async def app_route_add_image_marker(request: pss.Request):
+    # route should only used if pico is started in image receiving mode
+    text = request.headers['Marker-Text']
+    marker_id = await add_marker(text)
+    print(text, marker_id)
+    with open('marker_imgs/'+marker_id, 'wb') as f:
+        f.write(request.file)
+    return pss.generate_response(html=marker_id)
+app.add_route('/image_marker', 'POST', app_route_add_image_marker)
 
 async def app_route_view_tracks(request: pss.Request):
     filenames = [file for file in os.listdir('tracks')] + ['tracks.json', 'junctions.json', 'markers.json']
@@ -354,6 +373,12 @@ async def app_route_debug(request: pss.Request):
     return pss.generate_response(body=body)
 app.add_route('/debug', 'get', app_route_debug)
 
+async def start_web_server():
+    server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=0)
+    print(f'Server running on port 80')
+    led.on()
+    await server.wait_closed() # serve forever
+
 
 # main
 async def main():
@@ -374,6 +399,14 @@ async def main():
 
     async with OpenFileSafely('markers.json', 'r') as f:
         map_properties['markers'] = json.load(f)['markers']
+
+    # if key1 pressed on startup, initialize gps only and start server immediately.
+    # Need to do it this way because if all the other app functionality is loaded in,
+    # there's a high chance of running out of memory while receiving large images over
+    # the web app
+    if epd.key1.value() == 0 or True:
+        await gps.initialize()
+        await start_web_server()
 
     # create epaper thread manager and initialize epd
     asyncio.create_task(epd.manage_threads())
@@ -397,10 +430,7 @@ async def main():
     print('e-Paper key listener ready!')
     
     # start web server
-    server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=0)
-    print(f'Server running on port 80')
-    led.on()
-    await server.wait_closed() # serve forever
+    await start_web_server()
 
 # start server
 asyncio.run(main())

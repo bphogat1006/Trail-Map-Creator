@@ -72,7 +72,14 @@ def redirect(uri):
     return generate_response(status_code=303, status_text='See Other', response_headers=headers)
 
 class Request:
-    def __init__(self, request) -> None:
+    def __init__(self, buf) -> None:
+        try:
+            request = buf.decode()
+        except UnicodeError:
+            print('UnicodeError while decoding request: assuming request body contains a file')
+            requestParts = buf.split(b'\r\n\r\n', 1)
+            self.file = requestParts[1]
+            request = requestParts[0].decode()
         request = normalize_line_endings(request)
         requestParts = request.split('\n\n', 1)
         request_head = requestParts[0]
@@ -101,6 +108,9 @@ class Request:
         self.method = self.method.lower()
         if self.route[-1] != '/':
             self.route += '/'
+
+    def parse_form(self):
+        self.form = dict((param.split('=')[0], param.split('=')[1]) for param in self.body.split('&'))
 
 class App:
     def __init__(self) -> None:
@@ -136,13 +146,16 @@ class App:
 
         # parse request
         try:
-            buf = await asyncio.wait_for_ms(reader.read(MAX_RECV), 1000)
-            buf = buf.decode()
+            buf = b''
+            while 1:
+                new_data = await asyncio.wait_for_ms(reader.read(MAX_RECV), 500)
+                buf += new_data
         except asyncio.TimeoutError:
-            print(f'{client_addr}: Connection timed out, closing.')
-            writer.close()
-            await writer.wait_closed()
-            return
+            if buf == b'':
+                print(f'{client_addr}: No data received and connection timed out: closing.')
+                writer.close()
+                await writer.wait_closed()
+                return
         
         request = Request(buf)
 
