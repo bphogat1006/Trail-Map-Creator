@@ -172,9 +172,9 @@ class EPD_2in7:
         self.dc_pin = Pin(DC_PIN, Pin.OUT)
         
         
-        self.buffer_1Gray = bytearray(self.height * self.width // 8)
+        # self.buffer_1Gray = bytearray(self.height * self.width // 8)
         self.buffer_4Gray = bytearray(self.height * self.width // 4)
-        self.image1Gray = framebuf.FrameBuffer(self.buffer_1Gray, self.width, self.height, framebuf.MONO_HLSB)
+        # self.image1Gray = framebuf.FrameBuffer(self.buffer_1Gray, self.width, self.height, framebuf.MONO_HLSB)
         self.image4Gray = framebuf.FrameBuffer(self.buffer_4Gray, self.width, self.height, framebuf.GS2_HMSB)
         
         self.EPD_2IN7_Init_4Gray()
@@ -450,7 +450,7 @@ def epdDemo():
     
     epd = EPD_2in7()
     
-    epd.image1Gray.fill(0xff)
+    # epd.image1Gray.fill(0xff)
     epd.image4Gray.fill(0xff)
     
     epd.image4Gray.text("Waveshare", 5, 5, epd.black)
