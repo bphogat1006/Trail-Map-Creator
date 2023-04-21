@@ -55,6 +55,19 @@ if 1:
     preview = preview * (255 / 192)
     cv2.imwrite('storage/dcim/Tasker/TMC/quantized_preview.jpg', preview)
 
+# e-paper switches light and dark gray values
+tmp = 4
+img[img == 1] = tmp
+img[img == 2] = 1
+img[img == tmp] = 2
+
+# e-paper reverses every group of 4 pixels
+# probably because framebuf uses little endian.
+# (4 pixels is 1 byte)
+img = img.reshape((-1, 4))
+img = np.flip(img, axis=1)
+img = img.reshape(pico_shape)
+
 # write img to file as raw bytes
 with open('storage/dcim/Tasker/TMC/img_bytes', 'wb') as f:
     # 264*176 = 46464 pixels
