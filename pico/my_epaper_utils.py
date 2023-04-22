@@ -10,7 +10,7 @@ import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import flash_led
-from file_utils import FILE_OPEN_LOCK, TrackReader
+from file_utils import OpenFileSafely, TrackReader
 
 class EPD():
     def __init__(self):
@@ -274,5 +274,20 @@ class EPD():
             for part in textParts:
                 h += 13
                 self.epd.image4Gray.text(part, 5, h, self.epd.darkgray)
+        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
+        utime.sleep(15)
+
+    async def view_marker_img(self, marker_id: str):
+        print('viewing marker:', marker_id)
+        buf_index = 0
+        chunk_size = 32 # max possible chunk size is 32
+        async with OpenFileSafely('marker_imgs/'+marker_id, 'rb') as f:
+            while 1:
+                bytes_buf = f.read(chunk_size)
+                if bytes_buf == b'':
+                    break
+                for i in range(chunk_size):
+                    self.epd.buffer_4Gray[buf_index+i] = bytes_buf[i]
+                buf_index += chunk_size
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
         utime.sleep(15)

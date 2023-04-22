@@ -323,12 +323,13 @@ async def app_route_add_marker(request: pss.Request):
 app.add_route('/marker', 'POST', app_route_add_marker)
 
 async def app_route_add_image_marker(request: pss.Request):
-    # route should only used if pico is started in image receiving mode
+    # route should only used if pico is started in image receiving mode due to high memory usage
     text = request.headers['Marker-Text']
     marker_id = await add_marker(text)
-    print(text, marker_id)
+    print('marker text:', text, '\nmarker id:', marker_id)
     with open('marker_imgs/'+marker_id, 'wb') as f:
         f.write(request.file)
+    epd.run_in_thread(epd.view_marker_img, args=(marker_id,), is_async=True)
     return pss.generate_response(html=marker_id)
 app.add_route('/image_marker', 'POST', app_route_add_image_marker)
 
@@ -400,11 +401,12 @@ async def main():
     async with OpenFileSafely('markers.json', 'r') as f:
         map_properties['markers'] = json.load(f)['markers']
 
-    # if key1 pressed on startup, initialize gps only and start server immediately.
-    # Need to do it this way because if all the other app functionality is loaded in,
-    # there's a high chance of running out of memory while receiving large images over
-    # the web app
-    if epd.key1.value() == 0 or True:
+    # If key1 pressed on startup, initialize gps only and start server immediately.
+    # Puts app in marker image receiving mode.
+    # Need to do this because if all the other app functionality is loaded into RAM, there's
+    # a chance of running out of memory while receiving large images over the web app
+    if epd.key1.value() == 0:
+        await flash_led(3)
         await gps.initialize()
         await start_web_server()
 
