@@ -73,7 +73,7 @@ def revise(file):
 
 # save
 def save(file):
-    track_df.to_csv(file)
+    track_df.to_csv(file, index=False)
 
 def main():
     for i, filename in enumerate(filenames):
