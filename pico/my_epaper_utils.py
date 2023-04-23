@@ -18,43 +18,43 @@ class EPD():
         self.epd = None
         self.width = 176
         self.height = 264
-        self._epd_thread_queue = []
+        self.__epd_thread_queue = []
         self.key0 = Pin(15, Pin.IN, Pin.PULL_UP)
         self.key1 = Pin(17, Pin.IN, Pin.PULL_UP)
         self.key2 = Pin(2,  Pin.IN, Pin.PULL_UP)
-        self._key0_shortpress_func = None
-        self._key1_shortpress_func = None
-        self._key2_shortpress_func = None
-        self._EPD_READY = asyncio.Event()
-        self._EPD_READY.set()
+        self.__key0_shortpress_func = None
+        self.__key1_shortpress_func = None
+        self.__key2_shortpress_func = None
+        self.__EPD_READY = asyncio.Event()
+        self.__EPD_READY.set()
 
     def initialize(self, key0_shortpress_func, key0_longpress_func, key1_shortpress_func, key1_longpress_func, key2_shortpress_func, key2_longpress_func): # functions should be async
-        self._key0_shortpress_func = key0_shortpress_func
+        self.__key0_shortpress_func = key0_shortpress_func
         self._key0_longpress_func = key0_longpress_func
-        self._key1_shortpress_func = key1_shortpress_func
+        self.__key1_shortpress_func = key1_shortpress_func
         self._key1_longpress_func = key1_longpress_func
-        self._key2_shortpress_func = key2_shortpress_func
+        self.__key2_shortpress_func = key2_shortpress_func
         self._key2_longpress_func = key2_longpress_func
         self.epd = EPD_2in7()
         print('e-Paper ready!')
         
     async def manage_threads(self):
         async def async_thread_func(func, args):
-            self._EPD_READY.clear()
+            self.__EPD_READY.clear()
             await func(*args)
-            self._EPD_READY.set()
+            self.__EPD_READY.set()
         def sync_thread_func(func, args):
-            self._EPD_READY.clear()
+            self.__EPD_READY.clear()
             func(*args)
-            self._EPD_READY.set()
+            self.__EPD_READY.set()
         while 1:
-            if len(self._epd_thread_queue) == 0:
+            if len(self.__epd_thread_queue) == 0:
                 await asyncio.sleep(0.2)
                 continue
-            await self._EPD_READY.wait()
+            await self.__EPD_READY.wait()
             await asyncio.sleep(0.1) # give time for thread to exit
-            func, args, is_async = self._epd_thread_queue.pop(0)
-            print('Running e-paper function in thread. Queue length:', len(self._epd_thread_queue))
+            func, args, is_async = self.__epd_thread_queue.pop(0)
+            print('Running e-paper function in thread. Queue length:', len(self.__epd_thread_queue))
             if is_async:
                 start_new_thread(asyncio.create_task, (async_thread_func(func, args),))
             else:
@@ -65,10 +65,10 @@ class EPD():
     def run_in_thread(self, func: function, args=tuple(), is_async=True, priority=False):
         queue_obj = (func, args, is_async)
         if priority:
-            self._epd_thread_queue.insert(0, queue_obj)
+            self.__epd_thread_queue.insert(0, queue_obj)
         else:
-            self._epd_thread_queue.append(queue_obj)
-        print('Added function to e-paper thread queue of length', len(self._epd_thread_queue))
+            self.__epd_thread_queue.append(queue_obj)
+        print('Added function to e-paper thread queue of length', len(self.__epd_thread_queue))
 
     async def key_listener(self):
         sleepInterval = 0.3
@@ -84,7 +84,7 @@ class EPD():
                     asyncio.create_task(self._key0_longpress_func())
                 else:
                     # run short press task
-                    asyncio.create_task(self._key0_shortpress_func())
+                    asyncio.create_task(self.__key0_shortpress_func())
                     
             if self.key1.value() == 0:
                 print('Key 1 pressed')
@@ -96,7 +96,7 @@ class EPD():
                     asyncio.create_task(self._key1_longpress_func())
                 else:
                     # run short press task
-                    asyncio.create_task(self._key1_shortpress_func())
+                    asyncio.create_task(self.__key1_shortpress_func())
                     
             if self.key2.value() == 0:
                 print('Key 2 pressed')
@@ -108,7 +108,7 @@ class EPD():
                     asyncio.create_task(self._key2_longpress_func())
                 else:
                     # run short press task
-                    asyncio.create_task(self._key2_shortpress_func())
+                    asyncio.create_task(self.__key2_shortpress_func())
             await asyncio.sleep(sleepInterval)
 
 
