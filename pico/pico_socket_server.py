@@ -5,6 +5,7 @@ try:
 except ImportError:
     import asyncio
 import gc
+from file_utils import OpenFileSafely
 
 # set up access point
 ssid = "BOBYA_PICO_AP"
@@ -30,7 +31,7 @@ def normalize_line_endings(s):
 
 def get_html_template(template):
     html = None
-    with open(template, 'r') as template_file:
+    with OpenFileSafely(template, 'r') as template_file:
         html = template_file.read()
     return html
 

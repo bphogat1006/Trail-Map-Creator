@@ -327,7 +327,7 @@ async def app_route_add_image_marker(request: pss.Request):
     text = request.headers['Marker-Text']
     marker_id = await add_marker(text)
     print('marker text:', text, '\nmarker id:', marker_id)
-    with open('marker_imgs/'+marker_id, 'wb') as f:
+    with OpenFileSafely('marker_imgs/'+marker_id, 'wb') as f:
         f.write(request.file)
     epd.run_in_thread(epd.view_marker_img, args=(marker_id,), is_async=True)
     return pss.generate_response(html=marker_id)
