@@ -1,3 +1,4 @@
+import os
 from machine import Pin
 import utime
 from _thread import start_new_thread
@@ -10,7 +11,7 @@ import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
 from onboard_led import led, flash_led
-from file_utils import OpenFileSafely, TrackReader
+from file_utils import OpenFileSafely, TrackReader, file_exists
 
 class EPD():
     def __init__(self):
@@ -59,6 +60,8 @@ class EPD():
             else:
                 start_new_thread(sync_thread_func, (func, args))
 
+    # priority argument should only be used by functions in the EPD class. It is used
+    # to make sure write_buffer_to_display() is called directly after running an EPD function
     def run_in_thread(self, func: function, args=tuple(), is_async=True, priority=False):
         queue_obj = (func, args, is_async)
         if priority:
@@ -115,6 +118,7 @@ class EPD():
     def button_select(self, initial_val: int, min_val: int = 1, max_val: int = 10, on_change_callback: function = lambda x: x):
         # this function is intentionally asyncio-blocking
         curr_val = initial_val
+        utime.sleep(0.5)
         led.on()
         utime.sleep(0.3)
         def indicate_curr_val():
@@ -138,14 +142,22 @@ class EPD():
                 curr_val = min(max_val, curr_val + 1)
                 indicate_curr_val()
 
-    # write buffer to display
-    def update_display(self, finished_flag: asyncio.ThreadSafeFlag=None):
+    # Write epd buffer to the display, takes around ~6 seconds
+    # You may pass an asyncio flag to the finished_flag argument if desired
+    # Case 1: function is called from an AYSNCHRONOUS function
+    #   Asyncio tasks on CORE0 will be blocked until function finishes
+    # Case 2: function is called from a SYNCHRONOUS function
+    #   Case 2a: If called from CORE0, will block asyncio tasks until finished
+    #   Case 2b: If called from CORE1, will not block CORE0 asyncio tasks
+    # To avoid blocking asyncio tasks: use self.run_in_thread(self.write_buffer_to_display)
+    def write_buffer_to_display(self, finished_flag: asyncio.ThreadSafeFlag=None):
         self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
         if finished_flag is not None:
             finished_flag.set()
 
     # display tracking information while recording trails
     async def display_tracking_info(self, currTime, recordingDuration, timeSinceLastPoint, newPoints, numPointsTotal, trailWidth):
+        self.run_in_thread(self.write_buffer_to_display, is_async=False, priority=True)
         h=5
         self.epd.image4Gray.fill(self.epd.white)
         output = 'Current time\n'
@@ -166,9 +178,9 @@ class EPD():
             else:
                 self.epd.image4Gray.text(line, 5, h, self.epd.black)
             h += 13
-        self.run_in_thread(self.update_display, is_async=False, priority=True)
 
     async def draw_trails(self, gps: GPS, map_properties, finished_flag: asyncio.ThreadSafeFlag):
+        self.run_in_thread(self.write_buffer_to_display, args=(finished_flag,), is_async=False, priority=True)
         # transformation functions from (lat, long) to (x, y) coordinates
         currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
         scalingFactor = None
@@ -259,9 +271,6 @@ class EPD():
             currZoom = round(map_properties["width"])
         self.epd.image4Gray.text(f'Map width: {currZoom}m', 5, 5, self.epd.darkgray)
 
-        # update display
-        self.run_in_thread(self.update_display, args=(finished_flag,), is_async=False, priority=True)
-
     def dilate_image(self, color):
         pointsBuffer = []
         def draw_kernel(x, y):
@@ -278,37 +287,42 @@ class EPD():
         for p in pointsBuffer:
             draw_kernel(*p)
 
-    async def view_markers(self, gps: GPS, markers, search_range):
+    async def view_markers(self, gps: GPS, markers, finished_flag: asyncio.ThreadSafeFlag):
         self.epd.image4Gray.fill(self.epd.white)
         currLatlong = gps.latlong()
         h = 5
-        self.epd.image4Gray.text('Markers', 5, h, self.epd.black)
-        h += 13
-        self.epd.image4Gray.text(f'{len(markers)} within {search_range}m', 5, h, self.epd.black)
-        h += 13
-        for marker in markers:
-            # write marker location
+        self.epd.image4Gray.text('-- Markers Near You --', 5, h, self.epd.black)
+        for i, marker in enumerate(markers):
+            # write marker info header
+            # ex: 1) 10m N 88m E [o]
             xDist = round(gps.longToMeters(currLatlong[1] - marker['long']))
             yDist = round(gps.latToMeters(currLatlong[0] - marker['lat']))
-            xDirection = 'West' if xDist > 0 else 'East'
-            yDirection = 'South' if yDist > 0 else 'North'
+            xDirection = 'W' if xDist > 0 else 'E'
+            yDirection = 'S' if yDist > 0 else 'N'
+            marker_info = f'{i+1}) {abs(xDist)}m {xDirection} {abs(yDist)}m {yDirection}'
+            if await file_exists('marker_imgs/'+marker['id']):
+                marker_info += ' [o]' # indicate there is an image associated with the marker
             h += 13
-            self.epd.image4Gray.text(f'{abs(xDist)}m {xDirection}, {abs(yDist)}m {yDirection}', 5, h, self.epd.black)
+            self.epd.image4Gray.text(marker_info, 5, h, self.epd.black)
             # write marker text
-            text = marker['text']
+            marker_text = marker['text']
             lineLength = 20
-            textParts = [text[i:i+lineLength] for i in range(0, len(text), lineLength)]
+            textParts = [marker_text[i:i+lineLength] for i in range(0, len(marker_text), lineLength)]
             for part in textParts:
                 h += 13
                 self.epd.image4Gray.text(part, 5, h, self.epd.darkgray)
-        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
-        utime.sleep(15)
+        self.write_buffer_to_display(finished_flag)
 
-    async def view_marker_img(self, marker_id: str):
-        print('viewing marker:', marker_id)
+    async def view_marker_img(self, marker: str):
+        print('viewing marker:', marker['id'])
         buf_index = 0
         chunk_size = 32 # max possible chunk size is 32
-        async with OpenFileSafely('marker_imgs/'+marker_id, 'rb') as f:
+        file = 'marker_imgs/'+marker['id']
+        if not await file_exists(file):
+            print('No image associated with marker ID', marker['id'])
+            await flash_led(2)
+            return
+        async with OpenFileSafely(file, 'rb') as f:
             while 1:
                 bytes_buf = f.read(chunk_size)
                 if bytes_buf == b'':
@@ -316,5 +330,9 @@ class EPD():
                 for i in range(chunk_size):
                     self.epd.buffer_4Gray[buf_index+i] = bytes_buf[i]
                 buf_index += chunk_size
-        self.epd.EPD_2IN7_4Gray_Display(self.epd.buffer_4Gray)
-        utime.sleep(15)
+        self.epd.image4Gray.text(marker['text'], 5, 5, self.epd.white)
+
+        # display and intentionally block
+        self.write_buffer_to_display()
+        viewing_duration = 15 # seconds
+        utime.sleep(viewing_duration)

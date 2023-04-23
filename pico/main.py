@@ -3,7 +3,6 @@ try:
     import uasyncio as asyncio
 except ImportError:
     import asyncio
-import gc
 from machine import UART, Pin
 import utime
 import json
@@ -11,7 +10,7 @@ from onboard_led import led, flash_led
 from my_gps_utils import GPS
 from my_epaper_utils import EPD
 import pico_socket_server as pss
-from file_utils import OpenFileSafely, TrackReader
+from file_utils import OpenFileSafely, TrackReader, file_exists
 
 # GPS
 gps = GPS(UART(0, tx=Pin(0), rx=Pin(1), baudrate=9600), debug=False)
@@ -37,7 +36,7 @@ map_properties = {
     'zoom': {
         'levels': [300, 800, 'fit'],
         'current': 2 # current zoom level, zero indexed
-    }
+    },
 }
 
 
@@ -67,13 +66,13 @@ async def delete_junction():
     print('Deleting junction')
     await gps.update(3, led)
     currLatLong = gps.latlong()
-    minDist = 50 # meters
+    search_range = 50 # meters
     index = -1
     for i, junction in enumerate(map_properties['junctions']):
         junctionLatLong = (junction['lat'], junction['long'])
         dist = gps.dist(currLatLong, junctionLatLong)
-        if dist < minDist:
-            minDist = dist
+        if dist < search_range:
+            search_range = dist
             index = i
     if index != -1:
         map_properties['junctions'].pop(index)
@@ -85,32 +84,31 @@ async def add_marker(text):
     await gps.update(3, led)
     lat, long = gps.latlong()
     id = str(gps.time()) # ID to link markers to their corresponding images
-    map_properties['markers'].append({'lat': lat, 'long': long, 'text': text.strip(), 'id': id})
+    new_marker = {'lat': lat, 'long': long, 'text': text.strip(), 'id': id}
+    map_properties['markers'].append(new_marker)
     await save_markers_json()
     print('Number of markers:', len(map_properties['markers']))
-    return id
+    return new_marker
 
 async def delete_marker():
     print('Deleting nearest marker')
     await gps.update(3, led)
     currLatLong = gps.latlong()
-    minDist = 50 # meters
+    search_range = 50 # meters
     index = -1
     for i, marker in enumerate(map_properties['markers']):
         markerLatLong = (marker['lat'], marker['long'])
         dist = gps.dist(currLatLong, markerLatLong)
-        if dist < minDist:
-            minDist = dist
+        if dist < search_range:
+            search_range = dist
             index = i
     if index != -1:
         print('Deleting', map_properties['markers'][index])
         deleted_marker = map_properties['markers'].pop(index)
         marker_id = deleted_marker['id']
         print(marker_id)
-        try:
+        if await file_exists('marker_imgs/'+marker_id):
             os.remove('marker_imgs/'+marker_id)
-        except Exception as e:
-            print('Failed to delete marker img with ID', marker_id)
         print('Number of markers:', len(map_properties['markers']))
         await save_markers_json()
     else:
@@ -118,16 +116,29 @@ async def delete_marker():
 
 async def view_markers():
     print('Viewing nearby markers')
+    change_state(STOPPING)
     await gps.update(3, led)
     currLatLong = gps.latlong()
-    currZoom = map_properties['zoom']['levels'][map_properties['zoom']['current']]
-    search_range = 1000 if currZoom == 'fit' else currZoom # in meters
-    markers = []
-    for marker in map_properties['markers']:
-        markerLatLong = (marker['lat'], marker['long'])
-        if gps.dist(currLatLong, markerLatLong) < search_range:
-            markers.append(marker)
-    epd.run_in_thread(epd.view_markers, args=(gps, markers, search_range), is_async=True)
+    markers = map_properties['markers']
+    markers.sort(key=lambda marker: gps.dist(currLatLong, (marker['lat'], marker['long'])))
+    finished_flag = asyncio.ThreadSafeFlag()
+    epd.run_in_thread(epd.view_markers, args=(gps, markers, finished_flag), is_async=True)
+    await finished_flag.wait()
+    time_to_wait = 20
+    for _ in range(time_to_wait*10):
+        if epd.key1.value() == 0:
+            led.on()
+            utime.sleep(0.3)
+            led.off()
+            utime.sleep(0.7)
+            def callback(curr_val):
+                print(f'Selected marker = {curr_val}:', markers[curr_val-1]['text'])
+            selected_marker = epd.button_select(1, max_val=6, on_change_callback=callback)
+            epd.run_in_thread(epd.view_marker_img, (markers[selected_marker-1],), is_async=True)
+            break
+        utime.sleep(0.1)
+    change_state(IDLE)
+    asyncio.create_task(display_trails())
 
 async def update_map_properties():
     print('Updating map properties')
@@ -173,10 +184,10 @@ async def change_trail_width():
         
     # select new trail width
     global CURR_TRAIL_WIDTH
-    def on_change_callback(curr_val):
+    def callback(curr_val):
         print('Trail width:', curr_val)
-    CURR_TRAIL_WIDTH = epd.button_select(CURR_TRAIL_WIDTH, on_change_callback=on_change_callback)
-    
+    CURR_TRAIL_WIDTH = epd.button_select(CURR_TRAIL_WIDTH, on_change_callback=callback)
+
     # resume recording if necessary
     if recording_interrupted:
         asyncio.create_task(start_recording_trail())
@@ -268,21 +279,30 @@ async def display_trails():
     finished_flag = asyncio.ThreadSafeFlag()
     while CURR_STATE == IDLE:
         await update_map_properties()
-        gc.collect()
         
         # draw trails
         await gps.update(3)
         print('Displaying recorded trails on e-Paper')
+        if CURR_STATE != IDLE:
+            return
         epd.run_in_thread(epd.draw_trails, args=(gps, map_properties, finished_flag), is_async=True)
-        await finished_flag.wait()
 
+        # wait until finished or state change
+        while 1:
+            try:
+                await asyncio.wait_for_ms(finished_flag.wait(), 200)
+                break
+            except asyncio.TimeoutError:
+                if CURR_STATE != IDLE:
+                    return
+                continue
 
 ### Web app ###
 
 app = pss.App()
 
 async def app_route_home(request: pss.Request):
-    body = pss.get_html_template('home.html')
+    body = await pss.get_html_template('home.html')
     body = body.replace('CURR_STATE', CURR_STATE)
     return pss.generate_response(title='TMC Home', body=body)
 app.add_route('/', 'GET', app_route_home)
@@ -309,19 +329,16 @@ app.add_route('/marker', 'POST', app_route_add_marker)
 async def app_route_add_image_marker(request: pss.Request):
     # route should only used if pico is started in image receiving mode due to high memory usage
     text = request.headers['Marker-Text']
-    marker_id = await add_marker(text)
-    print('marker text:', text, '\nmarker id:', marker_id)
-    with OpenFileSafely('marker_imgs/'+marker_id, 'wb') as f:
+    new_marker = await add_marker(text)
+    print('marker text:', text, '\nmarker id:', new_marker['id'])
+    async with OpenFileSafely('marker_imgs/'+new_marker['id'], 'wb') as f:
         f.write(request.file)
-    epd.run_in_thread(epd.view_marker_img, args=(marker_id,), is_async=True)
-    return pss.generate_response(html=marker_id)
+    epd.run_in_thread(epd.view_marker_img, args=(new_marker['id'],), is_async=True)
+    return pss.generate_response(html=new_marker['id'])
 app.add_route('/image_marker', 'POST', app_route_add_image_marker)
 
 async def app_route_view_tracks(request: pss.Request):
     filenames = [file for file in os.listdir('tracks')] + ['tracks.json', 'junctions.json', 'markers.json']
-    # downloadPage = pss.get_html_template('download.html')
-    # downloadPage = downloadPage.replace('FILENAMES', ','.join(filenames))
-    # return pss.generate_response(body=downloadPage)
     return pss.generate_response(html=','.join(filenames))
 app.add_route('/view_tracks', 'GET', app_route_view_tracks)
 

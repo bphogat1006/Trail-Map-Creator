@@ -29,9 +29,9 @@ def normalize_line_endings(s):
     # Convert string containing various line endings like \n, \r or \r\n, to uniform \n.
     return '\n'.join(s.splitlines())
 
-def get_html_template(template):
+async def get_html_template(template):
     html = None
-    with OpenFileSafely(template, 'r') as template_file:
+    async with OpenFileSafely(template, 'r') as template_file:
         html = template_file.read()
     return html
 
