@@ -9,7 +9,7 @@ import gc
 import framebuf
 from epaper import EPD_2in7
 from my_gps_utils import GPS
-from onboard_led import flash_led
+from onboard_led import led, flash_led
 from file_utils import OpenFileSafely, TrackReader
 
 class EPD():
@@ -110,6 +110,33 @@ class EPD():
 
 
     ### Miscellaneous functions ###
+
+    # use buttons to select something
+    def button_select(self, initial_val: int, min_val: int = 1, max_val: int = 10, on_change_callback: function = lambda x: x):
+        # this function is intentionally asyncio-blocking
+        curr_val = initial_val
+        led.on()
+        utime.sleep(0.3)
+        def indicate_curr_val():
+            for i in range(curr_val):
+                led.off()
+                utime.sleep(0.15)
+                led.on()
+                utime.sleep(0.15)
+            on_change_callback(curr_val)
+            utime.sleep(max(0.2, 0.5-curr_val/10))
+        indicate_curr_val()
+        while 1:
+            if self.key0.value() == 0:
+                curr_val = max(min_val, curr_val - 1)
+                indicate_curr_val()
+            elif self.key1.value() == 0:
+                led.off()
+                utime.sleep(0.5)
+                return curr_val
+            elif self.key2.value() == 0:
+                curr_val = min(max_val, curr_val + 1)
+                indicate_curr_val()
 
     # write buffer to display
     def update_display(self, finished_flag: asyncio.ThreadSafeFlag=None):
@@ -262,7 +289,7 @@ class EPD():
         for marker in markers:
             # write marker location
             xDist = round(gps.longToMeters(currLatlong[1] - marker['long']))
-            yDist = round(gps.longToMeters(currLatlong[0] - marker['lat']))
+            yDist = round(gps.latToMeters(currLatlong[0] - marker['lat']))
             xDirection = 'West' if xDist > 0 else 'East'
             yDirection = 'South' if yDist > 0 else 'North'
             h += 13

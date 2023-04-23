@@ -166,34 +166,18 @@ async def update_map_properties():
 
 CURR_TRAIL_WIDTH = 1 # 1-5, in meters
 async def change_trail_width():
+    # stop recording if necessary
     recording_interrupted = True if CURR_STATE == TRACKING else False
     if recording_interrupted:
         await stop_recording_trail()
-    # this function intentionally uses blocking sleep statements
+        
+    # select new trail width
     global CURR_TRAIL_WIDTH
-    utime.sleep(0.3)
-    led.on()
-    utime.sleep(0.3)
-    def indicate_width():
-        print('Trail width:', CURR_TRAIL_WIDTH)
-        for i in range(CURR_TRAIL_WIDTH):
-            led.off()
-            utime.sleep(0.15)
-            led.on()
-            utime.sleep(0.15)
-        utime.sleep(max(0.2, 0.5-CURR_TRAIL_WIDTH/10))
-    indicate_width()
-    while 1:
-        if epd.key0.value() == 0:
-            CURR_TRAIL_WIDTH = max(1, CURR_TRAIL_WIDTH - 1)
-            indicate_width()
-        elif epd.key1.value() == 0:
-            led.off()
-            utime.sleep(1)
-            break
-        elif epd.key2.value() == 0:
-            CURR_TRAIL_WIDTH += 1
-            indicate_width()
+    def on_change_callback(curr_val):
+        print('Trail width:', curr_val)
+    CURR_TRAIL_WIDTH = epd.button_select(CURR_TRAIL_WIDTH, on_change_callback=on_change_callback)
+    
+    # resume recording if necessary
     if recording_interrupted:
         asyncio.create_task(start_recording_trail())
 
