@@ -4,7 +4,10 @@ from zipfile import ZipFile
 import simplekml
 
 DATA_DIR = 'storage/downloads'
+IMGS_DIR = 'storage/dcim/Tasker/TMC'
 DELETE_AFTER_READ = False
+
+files_to_zip = [os.path.join(DATA_DIR, 'TMC.kml'), os.path.join(IMGS_DIR, 'junction_icon.png'), os.path.join(IMGS_DIR, 'marker_icon.png')]
 
 # read json files
 with open(os.path.join(DATA_DIR, 'tracks.json')) as f:
@@ -54,6 +57,8 @@ for file in files:
 
 # Create KML file
 kml = simplekml.Kml()
+marker_schema: simplekml.Schema = kml.document.newschema()
+marker_schema.newsimplefield(name='pdfmaps_photos', type='string', displayname='Photos')
 # draw tracks
 for i,track in enumerate(tracks):
     ls = kml.newlinestring(name=files[i], coords=track)
@@ -64,21 +69,29 @@ for i,track in enumerate(tracks):
 for junc in junctions_json['junctions']:
     pnt = kml.newpoint(name=f'Junction: {junc["long"]}, {junc["lat"]}')
     pnt.coords = [(junc['long'], junc['lat'])]
-    pnt.style.labelstyle.scale=0
+    pnt.style.labelstyle.scale = 0
     pnt.style.iconstyle.scale = 1
     pnt.style.iconstyle.icon.href = 'junction_icon.png'
 # draw markers
 for marker in markers_json['markers']:
     pnt = kml.newpoint(name=f'Marker: {marker["text"]}')
     pnt.coords = [(marker['long'], marker['lat'])]
-    pnt.style.labelstyle.scale=0
+    pnt.style.labelstyle.scale = 0
     pnt.style.iconstyle.scale = 1
     pnt.style.iconstyle.icon.href = 'marker_icon.png'
-    pnt.style.balloonstyle.text = marker['text']
+    
+    # add image if there is one associated with this marker
+    img_filename = f"{marker['id']}.jpg"
+    img_path = os.path.join(IMGS_DIR, img_filename)
+    if os.access(img_path, os.F_OK):
+        schema_data = simplekml.SchemaData(marker_schema.id)
+        schema_data.newsimpledata('pdfmaps_photos', f'<![CDATA[<img src="{img_filename}" />]]>')
+        pnt.extendeddata.datas.append(schema_data)
+        files_to_zip.append(img_path)
 
 # Save KML
 output = kml.kml()
-print(output)
+# print(output)
 with open(os.path.join(DATA_DIR, 'TMC.kml'), 'w') as f:
     f.write(output)
 
@@ -87,8 +100,7 @@ try:
     os.remove(os.path.join(DATA_DIR, 'TMC.kmz'))
 except OSError:
     pass
-files_to_zip = ['TMC.kml', 'junction_icon.png', 'marker_icon.png']
 with ZipFile(os.path.join(DATA_DIR, 'TMC.kmz'), 'w') as zip:
     for file in files_to_zip:
-        zip.write(os.path.join(DATA_DIR, file), file)
-print('\nFinished')
+        zip.write(file, os.path.basename(file))
+print('\nFinished successfully')
