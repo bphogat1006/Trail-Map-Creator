@@ -14,10 +14,10 @@ class GPS:
     def __init__(self, uart: UART, debug=False):
         self.uart = uart
         self.reader = MicropyGPS()
-        self._gotInitialFix = False
+        self.__gotInitialFix = False
         self.debug = debug
         self.rtc = RTC()
-        # custom vars
+        # other
         self.timezone_diff = 4 # only used for self.timeFormatted()
         self.distBetweenLatitudes = 111190 # NOTE constant for anywhere in the world
         self.distBetweenLongitudes = 85050 # NOTE depends on which latitude you measure at. This is an approximation for latitude 40.1 N
@@ -50,35 +50,34 @@ class GPS:
 
     # fetch new gps data and update gps.reader
     async def update(self, count, led=None):
-        if count == 0:
-            if led is not None:
-                led.off()
-            return
+        if led is not None:
+            led.on()
+            
+        while True:
+            if count == 0:
+                break
+            
+            # update gps parser with data
+            data = await self._read_UART()
+            for char in data:
+                try:
+                    self.reader.update(char)
+                except Exception as e:
+                    err = f'Error in micropyGPS.update(): {e}'
+            
+            # make sure fix was not lost
+            if self.__gotInitialFix and \
+                    (self.reader.time_since_fix() == -1 or self.latlong()[0] == 0.0 or self.latlong()[1] == 0.0):
+                print('Waiting for GPS fix...')
+                count += 1
+            
+            # sleep 1s bc gps outputs at 1Hz, then continue
+            if count > 1:
+                await asyncio.sleep(1)
+            count -= 1
         
         if led is not None:
-                led.on()
-        
-        # update gps parser with data
-        data = await self._read_UART()
-        for char in data:
-            try:
-                self.reader.update(char)
-            except Exception as e:
-                err = f'Error in micropyGPS.update(): {e}'
-                # self.logError(err)
-        
-        # make sure fix was not lost
-        if self._gotInitialFix and \
-                (self.reader.time_since_fix() == -1 or self.latlong()[0] == 0.0 or self.latlong()[1] == 0.0):
-            err = 'GPS error: fix was lost!\n' + self.getDebugInfo()
-            # self.logError(err)
-            print('Waiting for GPS fix...')
-            count += 1
-        
-        # recurse
-        if count > 1:
-            await asyncio.sleep(1.1)
-        await self.update(count-1, led)
+            led.off()
 
     # get location fix
     async def initialize(self):
@@ -88,7 +87,7 @@ class GPS:
         while self.reader.time_since_fix() == -1:
             await asyncio.sleep(1.1)
             await self.update(1)
-        self._gotInitialFix = True
+        self.__gotInitialFix = True
         await self.update(3)
         # set RTC
         day, month, year, hour, minute, second = [int(x) for x in list(self.reader.date) + self.reader.timestamp]
@@ -136,11 +135,6 @@ class GPS:
         year, month, day, weekday, hour, minute, second, subsecond = self.rtc.datetime()
         timeString = f'{month}/{day}/{year}, {(hour-self.timezone_diff)%12}:{minute}:{second}'
         return timeString
-
-    def logError(self, err):
-        print(err)
-        # with open('gps_error.log', 'a') as log:
-        #     log.write(f'{self.time()}: {err}\n')
 
     def latToMeters(self, lat):
         return lat * self.distBetweenLatitudes
