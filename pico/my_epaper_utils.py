@@ -251,12 +251,14 @@ class EPD():
         # draw junctions
         for junction in map_properties['junctions']:
             x, y = transform(junction['lat'], junction['long'])
+            self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.white, True)
             self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.lightgray)
-            self.epd.image4Gray.text('x', x-3, y-4, self.epd.lightgray)
+            self.epd.image4Gray.text('x', x-4, y-4, self.epd.lightgray)
 
         # draw markers
         for marker in map_properties['markers']:
             x, y = transform(marker['lat'], marker['long'])
+            self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.white, True)
             self.epd.image4Gray.ellipse(x, y, 5, 5, self.epd.darkgray)
             self.epd.image4Gray.text('i', x-4, y-3, self.epd.darkgray)
         
