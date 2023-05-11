@@ -301,7 +301,15 @@ class EPD():
             yDist = round(gps.latToMeters(currLatlong[0] - marker['lat']))
             xDirection = 'W' if xDist > 0 else 'E'
             yDirection = 'S' if yDist > 0 else 'N'
-            marker_info = f'{i+1}) {abs(xDist)}m {xDirection} {abs(yDist)}m {yDirection}'
+            xDist = abs(xDist)
+            yDist = abs(yDist)
+            if xDist >= 1000:
+                xDist = round(xDist/100)/10
+                xDist = f'{xDist}k'
+            if yDist >= 1000:
+                yDist = round(yDist/100)/10
+                yDist = f'{yDist}k'
+            marker_info = f'{i+1}) {xDist}m {xDirection} {yDist}m {yDirection}'
             if await file_exists('marker_imgs/'+marker['id']):
                 marker_info += ' [o]' # indicate there is an image associated with the marker
             h += 13
