@@ -5,7 +5,7 @@
 
 <h2>Trails</h2>
 
-<h4>Record a new trail</h4>
+<h4>Record A New Trail</h4>
 <form action="/track" method="POST">
     <label for="track-filename">Optional description:</label>
     <input type="text" name="filename" id="track-filename">
@@ -36,12 +36,12 @@
 
 <h2>Miscellaneous</h2>
 
-<h4>View Recorded Tracks</h4>
-<form action="/view_tracks" method="GET">
+<h4>View Debugging Info</h4>
+<form action="/debug" method="GET">
     <input type="submit" value="View">
 </form>
 
-<h4>View debugging info</h4>
-<form action="/debug" method="GET">
-    <input type="submit" value="View">
+<h4 style="color: red">Reset Raspberry Pi</h4>
+<form action="/reset" method="POST">
+    <input type="submit" value="Reset">
 </form>

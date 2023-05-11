@@ -93,8 +93,8 @@ async def file_exists(file):
     try:
         await FILE_OPEN_LOCK.acquire()
         with open(file, 'r'):
-            FILE_OPEN_LOCK.release()
             return True
     except OSError:
-        FILE_OPEN_LOCK.release()
         return False
+    finally:
+        FILE_OPEN_LOCK.release()

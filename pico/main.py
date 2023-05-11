@@ -3,7 +3,7 @@ try:
     import uasyncio as asyncio
 except ImportError:
     import asyncio
-from machine import UART, Pin
+from machine import UART, Pin, soft_reset
 import utime
 import json
 from onboard_led import led, flash_led
@@ -34,8 +34,8 @@ def change_state(newState):
 map_properties = {
     'bounds': None,
     'zoom': {
-        'levels': [300, 800, 'fit'],
-        'current': 2 # current zoom level, zero indexed
+        'levels': ['fit', 200, 400, 800],
+        'current': 0 # current zoom level (zero indexed, default is 'fit')
     },
 }
 
@@ -133,8 +133,9 @@ async def view_markers():
             utime.sleep(0.7)
             def callback(curr_val):
                 print(f'Selected marker = {curr_val}:', markers[curr_val-1]['text'])
-            selected_marker = epd.button_select(1, max_val=6, on_change_callback=callback)
+            selected_marker = epd.button_select(1, max_val=min(len(markers), 8), on_change_callback=callback)
             epd.run_in_thread(epd.view_marker_img, (markers[selected_marker-1],), is_async=True)
+            utime.sleep(0.5)
             break
         utime.sleep(0.1)
     change_state(IDLE)
@@ -374,6 +375,10 @@ async def app_route_debug(request: pss.Request):
     '''
     return pss.generate_response(body=body)
 app.add_route('/debug', 'get', app_route_debug)
+
+async def app_route_reset(request: pss.Request):
+    soft_reset()
+app.add_route('/reset', 'post', app_route_reset)
 
 async def start_web_server():
     server = await asyncio.start_server(app.server_callback, '0.0.0.0', 80, backlog=0)
